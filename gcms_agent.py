@@ -542,6 +542,36 @@ TOOLS = [
             }
         }
     },
+    # --- 21. identify_with_ri (NEW — NIST-style MS+RI dual-dimension identification) ---
+    {
+        "type": "function",
+        "function": {
+            "name": "identify_with_ri",
+            "description": "NIST-style dual-dimension compound identification combining mass spectral similarity (cosine) + retention index proximity. Automatically uses the 1498-entry RI database for cross-validation. Produces confidence levels: 'confirmed' (MS>=900 + RI<20), 'high' (MS>=800), 'probable' (MS>=700), 'tentative' (MS>=600), 'low' (<600). This is the PRIMARY identification tool — use instead of search_public_libraries when RI data is available (after calibrate_ri).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "compound_name": {
+                        "type": "string",
+                        "description": "Specific compound or peak label to identify, e.g. 'RT_5.23' or 'hexanal'. If omitted, identifies ALL unidentified peaks."
+                    },
+                    "ri_measured": {
+                        "type": "number",
+                        "description": "Experimentally measured Kovats RI value for this peak. If omitted, auto-looks up from dataset (requires prior calibrate_ri)."
+                    },
+                    "min_confidence": {
+                        "type": "number",
+                        "description": "Minimum combined score to report (default 600). Higher = fewer but more reliable results."
+                    },
+                    "include_online": {
+                        "type": "boolean",
+                        "description": "Query MassBank.eu API for spectra not in local library (default true). Slower but adds ~139K compounds."
+                    }
+                },
+                "required": []
+            }
+        }
+    },
 ]
 
 # ============================================================
@@ -3881,6 +3911,199 @@ Next i
             "tip": "Use filter_data to exclude peaks with poor RI matches. RI + MS dual confirmation significantly reduces false identifications for isomers.",
         }, ensure_ascii=False)
 
+    # --------------------------------------------------------
+    # identify_with_ri (NEW — NIST-style MS+RI dual-dimension ID)
+    # --------------------------------------------------------
+    def _identify_with_ri(self, compound_name=None, ri_measured=None, min_confidence=600,
+                         include_online=True):
+        """NIST-style dual-dimension identification: MS cosine + RI proximity.
+
+        Uses the IdentificationEngine to combine mass spectral matching with
+        retention index cross-validation. Produces confidence levels from
+        'confirmed' to 'unreliable'.
+
+        Args:
+            compound_name: specific peak to identify, or None for all unidentified
+            ri_measured: experimental RI value (auto-looked up if omitted)
+            min_confidence: minimum combined score threshold
+            include_online: query MassBank API for missing spectra
+
+        Returns:
+            JSON with identification results and confidence assessment
+        """
+        if self.df is None:
+            return json.dumps({"error": "No data loaded. Run extract_all_data first."}, ensure_ascii=False)
+
+        try:
+            from identification_engine import IdentificationEngine
+            from public_library_manager import get_library_manager
+            import numpy as np
+        except ImportError as e:
+            return json.dumps({"error": f"Identification engine not available: {e}"}, ensure_ascii=False)
+
+        # Initialize engine
+        mgr = get_library_manager()
+        engine = IdentificationEngine(mgr)
+
+        # Determine which peaks to identify
+        targets = []
+        if compound_name:
+            # Find specific compound
+            matches = self.df[self.df['compound'].str.contains(compound_name, case=False, na=False)]
+            if matches.empty:
+                return json.dumps({
+                    "error": f"No peaks matching '{compound_name}'",
+                    "available": sorted(self.df['compound'].unique())[:30],
+                }, ensure_ascii=False)
+            targets = [(row['rt'], row['compound'], row.get('ri', None))
+                      for _, row in matches.iterrows()]
+        else:
+            # Identify all unidentified peaks
+            unidentified = self.df[
+                self.df['compound'].str.startswith('RT_', na=False) |
+                self.df['compound'].str.startswith('rt_', na=False)
+            ]
+            targets = [(row['rt'], row['compound'], row.get('ri', None))
+                      for _, row in unidentified.iterrows()]
+            if not targets:
+                return json.dumps({
+                    "status": "info",
+                    "message": "No unidentified peaks (RT_* labels) to identify. All peaks already have compound names.",
+                    "hint": "Use filter_data to see only unidentified peaks, or specify compound_name."
+                }, ensure_ascii=False)
+
+        if not targets:
+            return json.dumps({"error": "No targets to identify"}, ensure_ascii=False)
+
+        # --- Extract mass spectra for each target ---
+        results = []
+        specs_read = 0
+        specs_failed = 0
+
+        # Try to get actual mass spectra from data.ms
+        ms_available = False
+        try:
+            from aston.tracefile.agilent_ms import AgilentMS
+            ms_available = True
+        except ImportError:
+            pass
+
+        ms_cache = {}
+        for rt, cpd_name, ri_val in targets[:50]:  # Max 50 peaks
+            ions = None
+
+            if ms_available and self.data_dir:
+                # Try to extract spectrum from data.ms
+                try:
+                    # Find the sample containing this peak
+                    sample_rows = self.df[(abs(self.df['rt'] - rt) < 0.01)]
+                    if not sample_rows.empty:
+                        sample = sample_rows.iloc[0]['sample']
+                        if sample not in ms_cache:
+                            d_path = Path(self.data_dir) / sample if (Path(self.data_dir) / sample).exists() else None
+                            if d_path:
+                                ms_file = d_path / "data.ms"
+                                if ms_file.exists():
+                                    ms_cache[sample] = AgilentMS(str(ms_file))
+
+                        if sample in ms_cache:
+                            ms = ms_cache[sample]
+                            chrom = ms.data
+                            scan_idx = int(np.argmin(np.abs(chrom.index - rt)))
+                            row_data = chrom.values[scan_idx]
+                            intensities = row_data.toarray().flatten() if hasattr(row_data, 'toarray') else np.array(row_data).flatten()
+                            mask = intensities > 0
+                            if mask.sum() >= 5:
+                                mz_vals = chrom.columns[mask]
+                                ab_vals = intensities[mask]
+                                max_ab = ab_vals.max()
+                                ions = [(float(mz_vals[i]), int(ab_vals[i] / max_ab * 999))
+                                       for i in range(len(mz_vals))]
+                                specs_read += 1
+                except Exception:
+                    specs_failed += 1
+
+            # If no MS data available, try to get ions from the built-in flavor DB
+            if ions is None and not cpd_name.startswith('RT_'):
+                # Look up in FLAVOR_DB
+                for entry in FLAVOR_DB:
+                    if entry['name'] == cpd_name.lower():
+                        ions = [(mz, 999) for mz in entry['ions']]
+                        break
+
+            # If still no ions, use a generic search by name
+            if ions is None:
+                # Just do name-based lookup
+                name_results = engine.lib.search_by_name(cpd_name.replace('RT_', '').replace('rt_', ''))
+                results.append({
+                    'rt': round(rt, 4),
+                    'compound_label': cpd_name,
+                    'ions_available': False,
+                    'name_matches': name_results[:5],
+                })
+                continue
+
+            # --- Dual-dimension identification ---
+            ri_to_use = ri_measured if ri_measured is not None else ri_val
+            if ri_to_use and (ri_to_use <= 0 or ri_to_use > 5000):
+                ri_to_use = None
+
+            id_result = engine.identify(
+                ions,
+                ri_measured=ri_to_use,
+                min_confidence=min_confidence,
+                max_results=5,
+                include_online=include_online
+            )
+
+            results.append({
+                'rt': round(rt, 4),
+                'compound_label': cpd_name,
+                'ri_measured': ri_to_use,
+                'ions_available': True,
+                **{k: v for k, v in id_result.items() if k != 'all_matches'},
+                'top_matches': id_result['all_matches'][:5],
+            })
+
+            # Update DataFrame if high-confidence match found
+            if id_result['best_match'] and id_result['best_match']['confidence'] in ('confirmed', 'high'):
+                best = id_result['best_match']
+                mask = (abs(self.df['rt'] - rt) < 0.01)
+                self.df.loc[mask, 'compound'] = best['name']
+                self.df.loc[mask, 'match_factor'] = best['combined_score']
+                self.df.loc[mask, 'match_method'] = f"ms_ri_dual_{best['confidence']}"
+                if best.get('ri_diff') is not None:
+                    self.df.loc[mask, 'ri_confirmed'] = True
+
+        # --- Summary ---
+        confirmed = sum(1 for r in results if r.get('best_match', {}).get('confidence') == 'confirmed')
+        high = sum(1 for r in results if r.get('best_match', {}).get('confidence') == 'high')
+        probable = sum(1 for r in results if r.get('best_match', {}).get('confidence') == 'probable')
+        updated = confirmed + high
+
+        return json.dumps({
+            "status": "done",
+            "peaks_analyzed": len(results),
+            "spectra_extracted": specs_read,
+            "spectra_failed": specs_failed,
+            "ri_database_entries": len(engine.ri_db),
+            "ri_used": any(r.get('ri_measured') for r in results),
+            "identification_summary": {
+                "confirmed": confirmed,
+                "high_confidence": high,
+                "probable": probable,
+                "dataframe_updated": updated,
+            },
+            "results": results[:30],
+            "recommendation": (
+                f"{confirmed} peaks confirmed (MS+RI), {high} high confidence. "
+                f"{updated} peaks updated in dataset. "
+                + ("Run calibrate_ri first to enable RI-based confirmation for all peaks."
+                   if not any(r.get('ri_measured') for r in results) else
+                   "MS+RI dual-dimension identification complete. Confirmed IDs are suitable for publication.")
+            ),
+        }, ensure_ascii=False)
+
     @staticmethod
     def _align_peaks_by_rt(all_sample_peaks, rt_tolerance=0.03):
         """Align peaks from multiple samples by retention time.
@@ -4744,6 +4967,7 @@ def main():
             '/peaks': "Run peak detection on the loaded chromatographic data",
             '/library': "Show current status of open-source spectral libraries. If no libraries downloaded, offer to download MassBank EU and NIST WebBook (free, no registration). Then show how to use search_public_libraries.",
             '/identify': "Use search_public_libraries tool with search_type='all' to identify all currently unidentified peaks (RT_* labels) using free public spectral libraries (MoNA + MassBank + NIST WebBook + built-in MSP). Include live MoNA API search.",
+            '/id': "NIST-style MS+RI dual-dimension identification. Use identify_with_ri to combine cosine MS matching + retention index cross-validation. Produces confidence levels: confirmed/high/probable/tentative. This is the PRIMARY identification tool when RI data is available.",
             '/ri': "Auto-calibrate Kovats Retention Index for all peaks using alkane standard. If user has alkane data (C8-C30), detect alkanes, build RT→RI curve, calculate RI for all peaks, cross-reference with 1498-entry RI database. Or ask user for alkane sample name.",
             '/report': "Generate a comprehensive professional analysis report with biological interpretation, statistical analysis, and scientific references.",
             '/full': "Scan -> Extract -> Ask for filters -> Filter -> Stats -> Quality -> Compare -> Ask which plots user wants -> Generate only requested plots -> Report -> Export",
