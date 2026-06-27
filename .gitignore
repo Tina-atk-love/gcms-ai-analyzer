@@ -23,3 +23,6 @@ Thumbs.db
 
 # Temp/test scripts
 _*.py
+
+cleaned_path.txt
+public_libraries/metabolomics_workbench_gcms.json
