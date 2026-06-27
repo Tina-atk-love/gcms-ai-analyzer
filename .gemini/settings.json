@@ -1,0 +1,17 @@
+﻿{
+  "model": "gemini-2.5-pro",
+  "ui": {
+    "theme": "Default"
+  },
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "tools": {
+    "shell": {
+      "enabled": true
+    }
+  },
+  "approvalMode": "default"
+}

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Generated output (plots, reports, CSVs)
+output/
+*.xlsx
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Sensitive
+*.key
+*.token
+.env
+
+# Temp/test scripts
+_*.py
