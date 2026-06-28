@@ -14750,5 +14750,168 @@
     ],
     "n": 2,
     "cas": ""
+  },
+  "(1,1,1,2,3,3,3-2h7)isopropyl benzoate": {
+    "ri": 1216.7,
+    "all_ri": [
+      1207.2,
+      1212.7,
+      1216.7,
+      1219.7
+    ],
+    "n": 4,
+    "cas": "939-48-0",
+    "inchikey": "FEXQDZTYJVXMOS-UHFFFAOYSA-N"
+  },
+  "(2,2,2,-2h3)acetophenone": {
+    "ri": 1055.1,
+    "all_ri": [
+      1025.2,
+      1028.3,
+      1030.5,
+      1033.4,
+      1038.4,
+      1040.2,
+      1043.1,
+      1043.9,
+      1044.7,
+      1055.1,
+      1058.5,
+      1060.3,
+      1060.4,
+      1065.0,
+      1065.8,
+      1066.1,
+      1068.4,
+      1071.6,
+      1072.4
+    ],
+    "n": 19,
+    "cas": "98-86-2",
+    "inchikey": "KWOLFJPFCHCOCG-UHFFFAOYSA-N"
+  },
+  "(3e,7e,11e)-1-hydroxy-1-isopropyl-4,8,12-trimethylcyclotetradecatriene": {
+    "ri": 2161.7,
+    "all_ri": [
+      2161.7
+    ],
+    "n": 1,
+    "cas": "67814-27-1",
+    "inchikey": "ZVWXZFYWLABNOW-GDVLXBNMSA-N"
+  },
+  "(e)-1,2-dimethoxy-4-(1-propenyl)benzene": {
+    "ri": 1461.8,
+    "all_ri": [
+      1461.8
+    ],
+    "n": 1,
+    "cas": "6379-72-2",
+    "inchikey": "NNWHUJCUHAELCL-SNAWJCMRSA-N"
+  },
+  "(e)-3-phenyl-2-propenal": {
+    "ri": 1235.1,
+    "all_ri": [
+      1235.1
+    ],
+    "n": 1,
+    "cas": "104-55-2",
+    "inchikey": "KJPRLNWUNMBNBZ-QPJJXVBHSA-N"
+  },
+  "(r)-2-methyl-5-(1-methylethenyl)-2-cyclohexen-1-one": {
+    "ri": 1212.8,
+    "all_ri": [
+      1194.5,
+      1197.9,
+      1201.1,
+      1205.0,
+      1208.9,
+      1212.8,
+      1216.9,
+      1221.1,
+      1225.4,
+      1229.9,
+      1234.5
+    ],
+    "n": 11,
+    "cas": "6485-40-1",
+    "inchikey": "ULDHMXUKGWMISQ-SECBINFHSA-N"
+  },
+  "(z)-6-octadecenoic acid methyl ester": {
+    "ri": 2104.5,
+    "all_ri": [
+      2104.5
+    ],
+    "n": 1,
+    "cas": "2777-58-4",
+    "inchikey": "QRTVDKVXAFJVRU-YPKPFQOOSA-N"
+  },
+  "(z,z,z)-6,9,12-octadecatrienoic acid methyl ester": {
+    "ri": 2091.7,
+    "all_ri": [
+      2091.7
+    ],
+    "n": 1,
+    "cas": "16326-32-2",
+    "inchikey": "JFRWATCOFCPIBM-JPFHKJGASA-N"
+  },
+  "(z,z,z,z)-6,9,12,15-octadecatetraenoic acid methyl ester": {
+    "ri": 2088.4,
+    "all_ri": [
+      2088.4
+    ],
+    "n": 1,
+    "cas": "73097-00-4",
+    "inchikey": "BIRKCHKCDPCDEG-GJDCDIHCSA-N"
+  },
+  ",2-dimethylbutane": {
+    "ri": 537.7,
+    "all_ri": [
+      526.0,
+      526.3,
+      526.8,
+      528.5,
+      533.9,
+      534.5,
+      534.6,
+      535.0,
+      535.1,
+      535.3,
+      535.4,
+      535.5,
+      535.6,
+      536.1,
+      536.2,
+      536.7,
+      536.8,
+      536.9,
+      537.0,
+      537.1,
+      537.4,
+      537.7,
+      537.9,
+      538.0,
+      538.2,
+      538.6,
+      538.9,
+      539.0,
+      539.4,
+      539.6,
+      540.2,
+      540.8,
+      540.9,
+      541.3,
+      541.4,
+      541.7,
+      542.2,
+      543.4,
+      543.8,
+      544.8,
+      545.8,
+      547.4,
+      547.9
+    ],
+    "n": 43,
+    "cas": "75-83-2",
+    "inchikey": "HNRMPXKDFBEGFZ-UHFFFAOYSA-N"
   }
 }
