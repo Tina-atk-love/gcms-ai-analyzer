@@ -15096,5 +15096,177 @@
     "n": 1,
     "cas": "2257-09-2",
     "inchikey": "IZJDOKYDEWTZSO-UHFFFAOYSA-N"
+  },
+  "1-methylethyl benzoate": {
+    "ri": 1216.7,
+    "all_ri": [
+      1207.2,
+      1212.7,
+      1216.7,
+      1219.7
+    ],
+    "n": 4,
+    "cas": "939-48-0",
+    "inchikey": "FEXQDZTYJVXMOS-UHFFFAOYSA-N"
+  },
+  "1-para-menthen-3-yl acetate": {
+    "ri": 1303.3,
+    "all_ri": [
+      1303.3
+    ],
+    "n": 1,
+    "cas": "1204-30-4",
+    "inchikey": "NADGBBLSBLDJEH-UHFFFAOYSA-N"
+  },
+  "1-phenoxy-2-hydroxypropane": {
+    "ri": 1246.4,
+    "all_ri": [
+      1214.8,
+      1246.4
+    ],
+    "n": 2,
+    "cas": "770-35-4",
+    "inchikey": "IBLKWZIFZMJLFL-UHFFFAOYSA-N"
+  },
+  "1-phenylethanol": {
+    "ri": 1033.4,
+    "all_ri": [
+      1027.7,
+      1033.4
+    ],
+    "n": 2,
+    "cas": "98-85-1",
+    "inchikey": "WAPNOHKVXSQRPX-UHFFFAOYSA-N"
+  },
+  "1-phenylethyl alcohol": {
+    "ri": 1033.4,
+    "all_ri": [
+      1027.7,
+      1033.4
+    ],
+    "n": 2,
+    "cas": "98-85-1",
+    "inchikey": "WAPNOHKVXSQRPX-UHFFFAOYSA-N"
+  },
+  "1-piperoylpyrrolidine": {
+    "ri": 2892.6,
+    "all_ri": [
+      2892.6
+    ],
+    "n": 1,
+    "cas": "25924-78-1",
+    "inchikey": "GQIJYUMTOUBHSH-IJIVKGSJSA-N"
+  },
+  "1-trimethylsiloxyoctane": {
+    "ri": 1182.6,
+    "all_ri": [
+      1182.6
+    ],
+    "n": 1,
+    "cas": "14246-16-3",
+    "inchikey": "CDGIKLPUDRGJQN-UHFFFAOYSA-N"
+  },
+  "1.5-cyclooctadiene": {
+    "ri": 931.1,
+    "all_ri": [
+      931.1
+    ],
+    "n": 1,
+    "cas": "111-78-4",
+    "inchikey": "VYXHVRARDIDEHS-QGTKBVGQSA-N"
+  },
+  "10,11-dihydro-10-hydroxycarbazepine": {
+    "ri": 2527.9,
+    "all_ri": [
+      2527.9
+    ],
+    "n": 1,
+    "cas": "29331-92-8",
+    "inchikey": "BMPDWHIDQYTSHX-UHFFFAOYSA-N"
+  },
+  "12-methyltridecanoic acid methyl ester": {
+    "ri": 1682.7,
+    "all_ri": [
+      1682.7
+    ],
+    "n": 1,
+    "cas": "5129-58-8",
+    "inchikey": "FLESKWMKPOBWDE-UHFFFAOYSA-N"
+  },
+  "18-methylnonadecanoic acid methyl ester": {
+    "ri": 2290.8,
+    "all_ri": [
+      2290.8
+    ],
+    "n": 1,
+    "cas": "65301-91-9",
+    "inchikey": "IVHQIMJNEKWLSS-UHFFFAOYSA-N"
+  },
+  "2,3-dimethlpyrazine": {
+    "ri": 917.1,
+    "all_ri": [
+      897.2,
+      917.1
+    ],
+    "n": 2,
+    "cas": "5910-89-4",
+    "inchikey": "OXQOBQJCDNLAPO-UHFFFAOYSA-N"
+  },
+  "2,4,n,n-tetramethylaniline": {
+    "ri": 1798.1,
+    "all_ri": [
+      1149.6,
+      1798.1
+    ],
+    "n": 2,
+    "cas": "769-53-9",
+    "inchikey": "DZXAIYQRCQALGE-UHFFFAOYSA-N"
+  },
+  "2,4-decadienal": {
+    "ri": 1318.5,
+    "all_ri": [
+      1317.1,
+      1318.5,
+      1326.5
+    ],
+    "n": 3,
+    "cas": "25152-84-5",
+    "inchikey": "JZQKTMZYLHNFPL-BLHCBFLLSA-N"
+  },
+  "2,4-dimethoxycinnamic acid": {
+    "ri": 1962.9,
+    "all_ri": [
+      1962.9
+    ],
+    "n": 1,
+    "cas": "6972-61-8",
+    "inchikey": "YIKHDPHTFYWYJV-GQCTYLIASA-N"
+  },
+  "2,5-bis(trimethylsilyl)oxy-phenylacetic acid trimethylsilyl ester": {
+    "ri": 1822.7,
+    "all_ri": [
+      1822.7
+    ],
+    "n": 1,
+    "cas": "55334-62-8",
+    "inchikey": "NLTJSNRUCPSKFR-UHFFFAOYSA-N"
+  },
+  "2,6-bis(trimethylsilyloxy)benzoic acid trimethylsilyl ester": {
+    "ri": 1747.6,
+    "all_ri": [
+      1747.6
+    ],
+    "n": 1,
+    "cas": "3782-85-2",
+    "inchikey": "APVNJYLNHAHELF-UHFFFAOYSA-N"
+  },
+  "2,6-dimethoxybenzoic acid methyl ester": {
+    "ri": 1536.3,
+    "all_ri": [
+      1536.3
+    ],
+    "n": 1,
+    "cas": "2065-27-2",
+    "inchikey": "XLXVNKPXOIYLLE-UHFFFAOYSA-N"
   }
 }
