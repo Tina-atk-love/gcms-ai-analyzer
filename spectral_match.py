@@ -185,12 +185,44 @@ def estimate_ri_from_rt(rt_minutes, column_type='db5'):
         return rt_minutes * 100.0
 
 
+# ----- Category-based boosting -----
+
+def category_boost_factor(entry, target_category='food_flavor'):
+    """Compute a boost/penalty factor based on compound classification.
+
+    Food/flavor compounds get a boost, pharmaceuticals/industrial get penalized.
+    Unclassified compounds are neutral.
+
+    Returns:
+        float: multiplier 0.7-1.2 (0.7=penalized, 1.0=neutral, 1.2=boosted)
+    """
+    if not entry:
+        return 1.0
+
+    cat = entry.get('compound_class', 'other')
+    conf = entry.get('class_confidence', 0.0)
+
+    if cat == 'food_flavor':
+        # Boost food/flavor: 1.05 - 1.20 depending on confidence
+        return 1.05 + 0.15 * conf
+    elif cat == 'natural_product':
+        return 1.05 + 0.10 * conf
+    elif cat == 'pharmaceutical':
+        # Penalize pharma: 0.70 - 0.85 (reverse of confidence)
+        return 0.85 - 0.15 * min(conf, 1.0)
+    elif cat == 'industrial':
+        # Stronger penalty for industrial
+        return 0.75 - 0.10 * min(conf, 1.0)
+    else:
+        return 1.0  # 'other': neutral
+
+
 # ----- Main search functions -----
 
 def search_library(observed_ions, library=None, min_match=600,
                    search_mode='hybrid', tolerance=0.5,
                    ri_expected=None, ri_tolerance=50,
-                   ri_boost=True):
+                   ri_boost=True, category_boost=False):
     """Search observed mass spectrum against spectral library.
 
     Args:
@@ -202,10 +234,11 @@ def search_library(observed_ions, library=None, min_match=600,
         ri_expected: optional expected RI (from alkane calibration)
         ri_tolerance: acceptable RI deviation (default ±50)
         ri_boost: if True, boost matches with RI support; if False, only penalize
+        category_boost: if True, boost food/flavor, penalize pharma/industrial
 
     Returns:
         list of dicts: [{name, cas, formula, match_factor, ri, ri_penalty, ...}]
-        sorted by effective score descending (spectral match × RI penalty)
+        sorted by effective score descending (spectral match × RI × category)
     """
     from spectral_library import load_library as _load_library
 
@@ -232,10 +265,13 @@ def search_library(observed_ions, library=None, min_match=600,
         if mf >= min_match:
             # RI check
             lib_ri = entry.get('ri_exp')
-            penalty = ri_consistency_penalty(lib_ri, ri_expected, ri_tolerance)
+            ri_pen = ri_consistency_penalty(lib_ri, ri_expected, ri_tolerance)
 
-            # Effective score (spectral match × RI penalty)
-            effective_mf = int(mf * penalty)
+            # Category boost/penalty
+            cat_factor = category_boost_factor(entry) if category_boost else 1.0
+
+            # Effective score (spectral match × RI × category)
+            effective_mf = int(mf * ri_pen * cat_factor)
 
             if effective_mf >= min_match or mf >= min_match:
                 results.append({
@@ -245,7 +281,9 @@ def search_library(observed_ions, library=None, min_match=600,
                     'match_factor': mf,
                     'effective_match': effective_mf,
                     'ri': lib_ri,
-                    'ri_penalty': penalty,
+                    'ri_penalty': ri_pen,
+                    'category_factor': cat_factor,
+                    'compound_class': entry.get('compound_class', 'other'),
                     'num_peaks': entry.get('num_peaks', 0),
                 })
 

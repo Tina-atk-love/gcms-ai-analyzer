@@ -1,0 +1,26 @@
+{
+  "checked": [
+    "(+)-alpha-cyperone",
+    "(+)-alpha-muurolene",
+    "(+)-alpha-phenylethylamine",
+    "(+)-beta-hydrastine",
+    "(+)-camphor",
+    "(+)-cinchonine",
+    "(+)-diacetyl-l-tartaric acid",
+    "(+)-pantothenate",
+    "(+)-pantothenic acid",
+    "(+-)-alpha-tocopherol",
+    "(+-)-naringenin",
+    "(+-)-warfarin",
+    "(-)-2,6,6-trimethyl-2(r)-vinyl-5(r)-acetoxytetrahydropyran",
+    "(-)-2,6,6-trimethyl-2(r)-vinyltetrahydropyran-5-one",
+    "(-)-cinchonidine",
+    "(-)-epicatechin",
+    "(-)-epigallocatechin gallate",
+    "(-)-epinephrine",
+    "(-)-menthyl acrylate",
+    "(-)-riboflavin"
+  ],
+  "found": 0,
+  "total_checked": 20
+}
