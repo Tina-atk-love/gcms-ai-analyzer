@@ -82,21 +82,28 @@ def save_ri_database(ri_db):
 def query_nist_ri(compound_name, timeout=8):
     """Query NIST WebBook for Kovats RI values of a compound.
 
-    Returns list of RI values found, or empty list.
+    Returns dict: {'ri_values': [float, ...], 'cas': str}
+    ri_values is empty list if nothing found.
     """
+    result = {'ri_values': [], 'cas': ''}
     try:
         r = session.get(
             f"https://webbook.nist.gov/cgi/cbook.cgi?Name={compound_name}&Units=SI&Mask=2000",
             timeout=timeout
         )
         if r.status_code != 200:
-            return []
+            return result
 
         text = r.text
 
+        # Extract CAS Registry Number
+        cas_match = re.search(r'CAS Registry Number:\s*(\d{2,7}-\d{2}-\d)', text)
+        if cas_match:
+            result['cas'] = cas_match.group(1)
+
         # Check if page contains GC data
         if 'Gas Chromatography' not in text and 'Kovats' not in text:
-            return []
+            return result
 
         # Extract RI values from the GC table
         # Pattern: <td class="right-nowrap"> 1234.5 </td>
@@ -112,22 +119,15 @@ def query_nist_ri(compound_name, timeout=8):
             if 400 < val < 4000:
                 ri_values.append(round(val, 1))
 
-        return sorted(set(ri_values))
+        result['ri_values'] = sorted(set(ri_values))
+        return result
 
     except requests.exceptions.Timeout:
-        return []
+        return result
     except requests.exceptions.ConnectionError:
-        return []
+        return result
     except Exception:
-        return []
-
-
-def extract_cas_from_text(text):
-    """Extract CAS number from NIST page text."""
-    match = re.search(r'CAS Registry Number:\s*(\d{2,7}-\d{2}-\d)', text)
-    if match:
-        return match.group(1)
-    return ''
+        return result
 
 
 def show_status():
@@ -173,13 +173,18 @@ def show_status():
 def test_compound(name):
     """Test RI query for a single compound."""
     print(f"\nQuerying NIST for: {name}")
-    ri_values = query_nist_ri(name)
+    result = query_nist_ri(name)
+    ri_values = result['ri_values']
     if ri_values:
         median_ri = ri_values[len(ri_values) // 2]
         print(f"  RI values: {ri_values}")
         print(f"  Median RI: {median_ri}")
+        if result['cas']:
+            print(f"  CAS: {result['cas']}")
     else:
         print(f"  No RI data found on NIST WebBook")
+        if result['cas']:
+            print(f"  CAS (from page): {result['cas']}")
     print()
 
 
@@ -265,7 +270,8 @@ def main():
             name = (entry.get('name') or '').strip()
             ri_checked_session += 1
 
-            ri_values = query_nist_ri(name)
+            result = query_nist_ri(name)
+            ri_values = result['ri_values']
 
             if ri_values:
                 median_ri = ri_values[len(ri_values) // 2]
@@ -273,7 +279,7 @@ def main():
                     'ri': median_ri,
                     'all_ri': ri_values,
                     'n': len(ri_values),
-                    'cas': entry.get('cas', ''),
+                    'cas': result['cas'] or entry.get('cas', ''),
                 }
                 ri_new_session += 1
                 state['total_added'] = state.get('total_added', 0) + 1
