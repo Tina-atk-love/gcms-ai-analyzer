@@ -21,6 +21,9 @@ from public_library_manager import parse_msp_file
 try:
     import requests
     HAS_REQUESTS = True
+    # Suppress SSL warnings from verify=False
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 except ImportError:
     HAS_REQUESTS = False
 
@@ -48,30 +51,61 @@ def save_state(state):
 def query_pubchem_cas(name):
     """Query PubChem for CAS number of a compound by name.
 
-    Returns CAS string or empty string.
+    Uses the synonyms endpoint (CAS is listed as a synonym, not a property).
+    Returns CAS string (e.g. '66-25-1') or empty string.
     """
+    import re
+    import ssl
+
+    # URL-encode compound name for safety
+    from urllib.parse import quote
+    encoded = quote(name)
+
+    url = (
+        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/"
+        f"{encoded}/synonyms/JSON"
+    )
+
+    # CAS Registry Number pattern: 1-7 digits, hyphen, 2 digits, hyphen, 1 digit
+    cas_re = re.compile(
+        r'^(\d{2,7}-\d{2}-\d)$'
+    )
+
     try:
-        # Try PUG REST API
-        url = (
-            f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/"
-            f"{name}/property/CAS/JSON"
-        )
         if HAS_REQUESTS:
-            resp = requests.get(url, timeout=10)
+            # requests library: disable SSL verify to bypass CRL issue
+            resp = requests.get(
+                url,
+                headers={'User-Agent': 'GCMS-Analyzer/3.1 (research)'},
+                timeout=10,
+                verify=False  # Work around Windows CRYPT_E_REVOCATION_OFFLINE
+            )
             if resp.status_code != 200:
                 return ''
             data = resp.json()
         else:
             import urllib.request
+            # urllib: create unverified SSL context
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+
             req = urllib.request.Request(url, headers={
                 'User-Agent': 'GCMS-Analyzer/3.1 (research)'
             })
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
 
-        props = data.get('PropertyTable', {}).get('Properties', [])
-        if props and props[0].get('CAS'):
-            return props[0]['CAS']
+        # Extract CAS from synonyms list
+        synonyms = (
+            data.get('InformationList', {})
+            .get('Information', [{}])[0]
+            .get('Synonym', [])
+        )
+        for syn in synonyms:
+            if cas_re.match(syn.strip()):
+                return syn.strip()
+
         return ''
 
     except Exception:
