@@ -26,3 +26,15 @@ _*.py
 
 cleaned_path.txt
 public_libraries/metabolomics_workbench_gcms.json
+
+# GNPS download artifacts (large, regeneratable)
+gnps-page.TXT
+public_libraries/gnps_file_paths.json
+public_libraries/gnps_spectra.msp
+public_libraries/gnps_download_state.json
+
+# RI expansion state (local progress tracking)
+public_libraries/ri_expansion_state.json
+
+# msconvert path reference (local install)
+tools/msconvert.exe.path

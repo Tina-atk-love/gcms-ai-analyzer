@@ -4607,7 +4607,7 @@ The agent can auto-calibrate Kovats RI using an alkane standard (C8-C30):
 
 ### How to get NIST match + compound names (MassHunter Qualitative Analysis):
 1. Open MassHunter Qualitative Analysis
-2. File → Open Data File → browse to D:\Tina\Sample001.D → select data.ms
+2. File → Open Data File → browse to D:\\Tina\\Sample001.D → select data.ms
 3. Chromatogram → Integrate (or use method's integration parameters)
 4. Spectrum → Library Search Report → select NIST MS Search
 5. Select all peaks in chromatogram → click Search
@@ -4615,8 +4615,8 @@ The agent can auto-calibrate Kovats RI using an alkane standard (C8-C30):
 7. File → Export → CSV
 8. In export dialog, ensure these columns are selected:
    ☑ Name  ☑ RT  ☑ Area  ☑ Match  ☑ CAS  ☑ Formula
-9. Save as: `Sample001_library.csv` inside `D:\Tina\Sample001.D\`
-   (or save all as `SampleXXX_library.csv` in D:\Tina directly)
+9. Save as: `Sample001_library.csv` inside `D:\\Tina\\Sample001.D\\`
+   (or save all as `SampleXXX_library.csv` in D:\\Tina directly)
 10. Repeat for all 16 samples (use batch method if available:
     Tools → Batch Library Search → select all samples)
 11. Re-run extract_all_data — agent auto-detects *library*.csv files,
