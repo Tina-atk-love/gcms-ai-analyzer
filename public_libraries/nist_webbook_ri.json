@@ -15268,5 +15268,14 @@
     "n": 1,
     "cas": "2065-27-2",
     "inchikey": "XLXVNKPXOIYLLE-UHFFFAOYSA-N"
+  },
+  "2-benzyloxyethyl alcohol": {
+    "ri": 1252.6,
+    "all_ri": [
+      1252.6
+    ],
+    "n": 1,
+    "cas": "622-08-2",
+    "inchikey": "CUZKCNWZBXLAJX-UHFFFAOYSA-N"
   }
 }
