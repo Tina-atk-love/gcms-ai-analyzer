@@ -111,6 +111,14 @@ def parse_msp_file(filepath):
                 pass
             continue
 
+        # Retention Index (Kovats RI)
+        if line_upper.startswith('RETENTIONINDEX:') or line_upper.startswith('RETENTION INDEX:'):
+            try:
+                current['ri_exp'] = float(line_stripped.split(':', 1)[1].strip())
+            except ValueError:
+                pass
+            continue
+
         # Num Peaks (both formats)
         if 'NUM PEAKS' in line_upper or 'NUM PEAKS' in line_upper.replace(' ', ''):
             try:
