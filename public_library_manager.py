@@ -458,6 +458,192 @@ def parse_nist_webbook_csv(filepath):
 
 
 # ============================================================
+# JCAMP-DX Parser (EI-MS spectral library exchange format)
+# ============================================================
+def parse_jcamp_file(filepath):
+    """Parse JCAMP-DX format mass spectral library file.
+
+    JCAMP-DX (JCAMP Data Exchange) format for mass spectra:
+      ##TITLE=Compound Name
+      ##JCAMP-DX=4.24
+      ##DATA TYPE=MASS SPECTRUM
+      ##CAS REGISTRY NO=xxx-xx-x
+      ##MOLFORM=C6H12O
+      ##MW=100.159
+      ##$RETENTION INDEX=800        (optional Kovats RI)
+      ##XUNITS=M/Z
+      ##YUNITS=RELATIVE ABUNDANCE
+      ##NPOINTS=N
+      ##PEAK TABLE=(XY..XY)
+      41,999 42,345 43,567 ...
+      ##END=
+
+    Multi-entry files (concatenated ##END= ... ##TITLE= blocks) are supported.
+
+    Returns list of dicts with keys: name, cas, formula, mw, ri_exp, peaks, source
+    """
+    entries = []
+    current = None
+    in_peak_table = False
+    peak_lines = []
+
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            raw = f.read()
+    except Exception:
+        try:
+            with open(filepath, 'r', encoding='latin-1', errors='ignore') as f:
+                raw = f.read()
+        except Exception:
+            return entries
+
+    def finalize_entry(cur, peak_lines_list):
+        """Parse accumulated peak lines and finalize current entry."""
+        if cur is None:
+            return None
+        # Parse all accumulated peak lines
+        all_peaks = []
+        for pline in peak_lines_list:
+            # Split by whitespace (JCAMP format: "mz,intensity" or "mz intensity" pairs)
+            for token in pline.split():
+                token = token.strip().rstrip(',')
+                if not token:
+                    continue
+                # Handle both "mz,intensity" and "mz intensity" formats
+                if ',' in token:
+                    parts = token.split(',')
+                else:
+                    # Might be two consecutive tokens... handled below
+                    continue
+                if len(parts) == 2:
+                    try:
+                        mz_val = int(float(parts[0]))
+                        intensity = int(float(parts[1]))
+                        if mz_val > 0 and intensity >= 0:
+                            all_peaks.append((mz_val, intensity))
+                    except (ValueError, OverflowError):
+                        continue
+        if all_peaks and len(all_peaks) >= 3:
+            cur['peaks'] = all_peaks
+            cur['num_peaks'] = len(all_peaks)
+            # Normalize intensities to 999 base peak
+            max_int = max(p[1] for p in all_peaks)
+            if max_int > 0 and max_int != 999:
+                cur['peaks'] = [(mz, int(i * 999 / max_int)) for mz, i in all_peaks]
+            return cur
+        return None
+
+    for line in raw.split('\n'):
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # Detect start of new entry
+        if stripped.upper().startswith('##TITLE='):
+            # Finalize previous entry
+            entry = finalize_entry(current, peak_lines)
+            if entry:
+                entries.append(entry)
+            # Start new entry
+            title = stripped.split('=', 1)[1].strip()
+            current = {
+                'name': title.lower(),
+                'source': 'jcamp',
+                'source_file': str(Path(filepath).name),
+                'peaks': [],
+            }
+            in_peak_table = False
+            peak_lines = []
+            continue
+
+        if current is None:
+            continue
+
+        upper = stripped.upper()
+
+        # CAS REGISTRY NO
+        if upper.startswith('##CAS REGISTRY NO=') or upper.startswith('##CAS REGISTRY NUMBER='):
+            current['cas'] = stripped.split('=', 1)[1].strip()
+            continue
+
+        # Molecular formula
+        if upper.startswith('##MOLFORM=') or upper.startswith('##MOLECULAR FORMULA='):
+            current['formula'] = stripped.split('=', 1)[1].strip()
+            continue
+
+        # Molecular weight
+        if upper.startswith('##MW='):
+            try:
+                current['mw'] = float(stripped.split('=', 1)[1].strip())
+            except ValueError:
+                pass
+            continue
+
+        # Retention index (Kovats RI) — note: uses ##$ prefix (JCAMP-DX "custom label")
+        if upper.startswith('##$RETENTION INDEX=') or upper.startswith('##RETENTION INDEX='):
+            try:
+                current['ri_exp'] = float(stripped.split('=', 1)[1].strip())
+            except ValueError:
+                pass
+            continue
+
+        # RT (alternative retention time field)
+        if upper.startswith('##$RT=') or upper.startswith('##RT='):
+            try:
+                current['rt_exp'] = float(stripped.split('=', 1)[1].strip())
+            except ValueError:
+                pass
+            continue
+
+        # DATA TYPE — skip (informational)
+        if upper.startswith('##DATA TYPE='):
+            spectrum_type = stripped.split('=', 1)[1].strip()
+            current['spectrum_type'] = spectrum_type
+            continue
+
+        # NPOINTS — informational
+        if upper.startswith('##NPOINTS='):
+            try:
+                current['npoints'] = int(stripped.split('=', 1)[1].strip())
+            except ValueError:
+                pass
+            continue
+
+        # JCAMP-DX version, XUNITS, YUNITS, XFACTOR, YFACTOR, FIRSTX/Y, LASTX/Y, MAXX/Y, MINX/Y — skip
+        if any(upper.startswith(f'##{h}') for h in
+               ['JCAMP-DX=', 'XUNITS=', 'YUNITS=', 'XFACTOR=', 'YFACTOR=',
+                'FIRSTX=', 'LASTX=', 'FIRSTY=', 'MAXX=', 'MINX=']):
+            continue
+
+        # PEAK TABLE marker
+        if upper.startswith('##PEAK TABLE='):
+            in_peak_table = True
+            # Check if peak data starts on same line after "##PEAK TABLE=(XY..XY)"
+            rest = stripped.split('=', 1)[1].strip()
+            if rest and rest.upper() != '(XY..XY)':
+                # Data on same line
+                peak_lines.append(rest)
+            continue
+
+        # END marker
+        if upper.startswith('##END='):
+            in_peak_table = False
+            continue
+
+        # Accumulate peak data lines
+        if in_peak_table:
+            peak_lines.append(stripped)
+            continue
+
+    # Finalize last entry
+    entry = finalize_entry(current, peak_lines)
+    if entry:
+        entries.append(entry)
+
+    return entries
+
+
+# ============================================================
 # Cosine Similarity Engine
 # ============================================================
 def cosine_similarity_weighted(observed_ions, reference_ions, tolerance=0.5):
@@ -575,6 +761,22 @@ class PublicLibraryManager:
         self._add_entries(entries, 'nist_webbook_csv')
         return len(entries)
 
+    def load_jcamp_file(self, filepath):
+        """Load a JCAMP-DX format mass spectral library file.
+
+        Supports both .jdx and .jcamp extensions. Handles multi-entry files
+        (concatenated ##TITLE=...##END= blocks).
+
+        Extracts: name, CAS, formula, MW, retention index (##$RETENTION INDEX),
+                  and peak table as (m/z, intensity) pairs.
+        """
+        entries = parse_jcamp_file(filepath)
+        for entry in entries:
+            entry['source'] = 'jcamp'
+            entry['source_file'] = str(Path(filepath).name)
+        self._add_entries(entries, 'jcamp')
+        return len(entries)
+
     def load_downloaded_libraries(self):
         """Scan public_libraries/ directory and load all found libraries."""
         total = 0
@@ -597,6 +799,10 @@ class PublicLibraryManager:
                 elif suffix == '.csv':
                     n = self.load_nist_csv(f)
                     print(f"  Loaded CSV: {f.name} ({n} entries)")
+                    total += n
+                elif suffix in ('.jdx', '.jcamp', '.dx'):
+                    n = self.load_jcamp_file(f)
+                    print(f"  Loaded JCAMP-DX: {f.name} ({n} entries)")
                     total += n
             except Exception as e:
                 print(f"  [WARN] Failed to load {f.name}: {e}")

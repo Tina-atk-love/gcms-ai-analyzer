@@ -112,7 +112,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "extract_all_data",
-            "description": "Parse REPORT01.CSV (UTF-16 LE) from all .D folders. Returns structured amino acid concentration data. Must be called after scan and before any analysis that needs data.",
+            "description": "Parse REPORT01.CSV (UTF-16 LE) from all .D folders. Returns structured compound concentration data. Must be called after scan and before any analysis that needs data.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -130,13 +130,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_sample_info",
-            "description": "Get detailed amino acid profile for a specific sample: concentration, retention time, peak area, and percentage of total amino acids. Supports fuzzy name/number matching.",
+            "description": "Get detailed compound profile for a specific sample: concentration, retention time, peak area, and percentage of total compounds. Supports fuzzy name/number matching.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "sample_name": {
                         "type": "string",
-                        "description": "Sample name, e.g. '37', 'egg yolk gel 1', supports fuzzy matching"
+                        "description": "Sample name, e.g. 'Sample001', 'Raw-MP', supports fuzzy matching"
                     }
                 },
                 "required": ["sample_name"]
@@ -148,7 +148,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "compare_groups",
-            "description": "Compare amino acid profiles between two groups. Performs Welch t-test, Mann-Whitney U test, computes fold change, Cohen's d effect size, and FDR-adjusted p-values. Returns compounds sorted by significance.",
+            "description": "Compare compound profiles between two groups. Performs Welch t-test, Mann-Whitney U test, computes fold change, Cohen's d effect size, and FDR-adjusted p-values. Returns compounds sorted by significance.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -184,7 +184,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "run_statistical_analysis",
-            "description": "Run full statistical analysis: descriptive statistics (mean/std/CV%/quartiles), group comparison (t-test + MWU with FDR), and amino acid correlation matrix.",
+            "description": "Run full statistical analysis: descriptive statistics (mean/std/CV%/quartiles), group comparison (t-test + MWU with FDR), and compound correlation matrix.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -203,7 +203,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "find_anomalies",
-            "description": "Detect outliers using Z-score method. Marks amino acid values exceeding the threshold within each compound. Also identifies affected samples.",
+            "description": "Detect outliers using Z-score method. Marks compound values exceeding the threshold within each compound. Also identifies affected samples.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -244,7 +244,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "volcano_plot",
-            "description": "Generate a volcano plot (log2 fold change vs -log10 p-value) comparing two groups. Highlights significantly different amino acids above fold-change and p-value thresholds. Ideal for identifying key biomarkers at a glance.",
+            "description": "Generate a volcano plot (log2 fold change vs -log10 p-value) comparing two groups. Highlights significantly different compounds above fold-change and p-value thresholds. Ideal for identifying key biomarkers at a glance.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -263,7 +263,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "correlation_heatmap",
-            "description": "Generate a hierarchically clustered correlation heatmap showing amino acid co-variation patterns across all samples. Includes dendrograms for both rows and columns. Useful for discovering metabolic relationships.",
+            "description": "Generate a hierarchically clustered correlation heatmap showing compound co-variation patterns across all samples. Includes dendrograms for both rows and columns. Useful for discovering metabolic relationships.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -314,7 +314,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "comprehensive_report",
-            "description": "Generate a professional analysis report suitable for publication. Includes: full statistical analysis, all figures, biological interpretation of amino acid profiles, nutritional/functional significance, comparison with literature values, and scientific references. Saves a formatted report to the output directory. Use this when the user wants paper-quality analysis, not just quick stats.",
+            "description": "Generate a professional analysis report suitable for publication. Includes: full statistical analysis, all figures, biological/chemical interpretation of compound profiles, functional significance, comparison with literature values, and scientific references. Saves a formatted report to the output directory. Use this when the user wants paper-quality analysis, not just quick stats.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -329,7 +329,7 @@ TOOLS = [
                     "report_type": {
                         "type": "string",
                         "enum": ["full", "comparison", "profile", "quality"],
-                        "description": "Report type: full=comprehensive report with all sections, comparison=group comparison focused, profile=amino acid profiling focused, quality=QC focused"
+                        "description": "Report type: full=comprehensive report with all sections, comparison=group comparison focused, profile=compound profiling focused, quality=QC focused"
                     }
                 },
                 "required": []
@@ -422,6 +422,24 @@ TOOLS = [
                     }
                 },
                 "required": ["group_name", "samples"]
+            }
+        }
+    },
+    # --- 17b. rename_samples (NEW) ---
+    {
+        "type": "function",
+        "function": {
+            "name": "rename_samples",
+            "description": "Rename sample IDs to user-friendly display names for plots. Takes comma-separated mapping like 'Sample001.D=Raw-MP,Sample002.D=PB'. ALWAYS call this when user provides descriptive sample names. After renaming, all plots and reports will use the new names.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mapping": {
+                        "type": "string",
+                        "description": "Comma-separated key=value pairs mapping original sample IDs to display names, e.g. 'Sample001.D=Raw-MP,Sample002.D=PB,Sample003.D=pH2-B'"
+                    }
+                },
+                "required": ["mapping"]
             }
         }
     },
@@ -569,6 +587,24 @@ TOOLS = [
                     }
                 },
                 "required": []
+            }
+        }
+    },
+    # --- 22. load_replicate_batch (NEW) ---
+    {
+        "type": "function",
+        "function": {
+            "name": "load_replicate_batch",
+            "description": "Load a replicate experiment batch (same samples, different run) and merge with existing data. Automatically applies the same sample renames and group assignments from batch 1. Plots will then show error bars reflecting batch-to-batch variability. Use this when the user has repeated the same experiment and wants to combine data for statistical analysis.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data_dir": {
+                        "type": "string",
+                        "description": "Path to the replicate experiment's data directory"
+                    }
+                },
+                "required": ["data_dir"]
             }
         }
     },
@@ -731,6 +767,12 @@ class GCMSAgent:
 
         self.data_dir = data_dir
         self.df = None
+        self.df_unfiltered = None
+        self.df_filtered = None
+        self._batch_count = 0
+        self._batch_dirs = []
+        self._rename_mapping = {}
+        self._group_assignments = {}
         self.analysis = {}
         self.d_folders = {}
         self.messages = []
@@ -865,7 +907,7 @@ class GCMSAgent:
         self.d_folders = result
         return json.dumps(result, ensure_ascii=False)
 
-    def _extract_all_data(self, data_dir=None):
+    def _extract_all_data(self, data_dir=None, batch=1):
         data_dir = data_dir or self.data_dir
         scan = json.loads(self._scan_data_directory(data_dir))
         if "error" in scan:
@@ -934,12 +976,16 @@ class GCMSAgent:
                         "height": rec.get("height", 0),
                         "amount": rec["area"],
                         "conc_g100g": rec["area_pct"],
+                        "batch": batch,
                     })
 
                 fallback_used.append(f"TIC_CSV + peak detection ({tic_processed} samples, {len(set(r['compound'] for r in aligned))} compounds aligned)")
 
             if records:
                 self.df = pd.DataFrame(records)
+                self._batch_count = max(self._batch_count, batch)
+                if data_dir not in self._batch_dirs:
+                    self._batch_dirs.append(data_dir)
                 compounds = sorted(self.df['compound'].unique().tolist())
 
                 # ================================================================
@@ -1085,6 +1131,7 @@ class GCMSAgent:
                 return json.dumps({
                     "status": "success",
                     "data_type": "TIC_CSV",
+                    "batch": batch,
                     "peak_detection": True,
                     "total_records": len(self.df),
                     "n_samples": int(self.df['sample'].nunique()),
@@ -1242,14 +1289,19 @@ class GCMSAgent:
                         'area': p['area'],
                         'amount': p['amount'],
                         'conc_g100g': p['conc_g100g'],
+                        'batch': batch,
                     })
             elif not data_source:
                 skipped.append({**info, "error": "No parseable data found"})
 
         if records:
             self.df = pd.DataFrame(records)
+            self._batch_count = max(self._batch_count, batch)
+            if data_dir not in self._batch_dirs:
+                self._batch_dirs.append(data_dir)
             summary = {
                 "status": "success",
+                "batch": batch,
                 "total_records": len(records),
                 "n_samples": int(self.df['sample'].nunique()),
                 "compounds": sorted(self.df['compound'].unique().tolist()),
@@ -1522,7 +1574,8 @@ class GCMSAgent:
         ax.set_xticks(x)
         ax.set_xticklabels(aa_cols, rotation=30, ha='right', fontsize=9)
         ax.set_ylabel('Concentration [g/100g]', fontsize=12)
-        ax.set_title(title or 'Amino Acid Concentration by Group', fontsize=14, fontweight='bold')
+        if title:
+            ax.set_title(title, fontsize=14, fontweight='bold')
         ax.legend(fontsize=9, loc='upper right')
         plt.tight_layout()
 
@@ -1555,9 +1608,11 @@ class GCMSAgent:
             dendrogram_ratio=(0.15, 0.1),
             xticklabels=True, yticklabels=True,
         )
-        g.ax_heatmap.set_xlabel('Amino Acid', fontsize=12)
+        # x-label left blank intentionally — agent must ask user
+        # g.ax_heatmap.set_xlabel('', fontsize=12)
         g.ax_heatmap.set_ylabel('Sample', fontsize=12)
-        g.fig.suptitle(title or 'Hierarchical Clustering Heatmap', fontsize=14, fontweight='bold', y=1.02)
+        if title:
+            g.fig.suptitle(title, fontsize=14, fontweight='bold', y=1.02)
 
         p = str(OUTPUT_DIR / "plots" / "heatmap.png")
         g.savefig(p, dpi=300, bbox_inches='tight')
@@ -1611,7 +1666,7 @@ class GCMSAgent:
 
         ax.set_xlabel(f'PC1 ({evr[0]*100:.1f}%)', fontsize=12)
         ax.set_ylabel(f'PC2 ({evr[1]*100:.1f}%)', fontsize=12)
-        ax.set_title('PCA Scores with 95% CI', fontsize=13, fontweight='bold')
+        ax.set_title('PCA Scores (95% CI)', fontsize=13, fontweight='bold')
         ax.legend(fontsize=9)
         ax.grid(alpha=0.3, linestyle='--')
 
@@ -1692,7 +1747,8 @@ class GCMSAgent:
         for i in range(len(avail), len(axes)):
             axes[i].set_visible(False)
 
-        fig.suptitle(title or 'Amino Acid Distribution by Group', fontsize=14, fontweight='bold', y=1.01)
+        if title:
+            fig.suptitle(title, fontsize=14, fontweight='bold', y=1.01)
         plt.tight_layout()
         p = str(OUTPUT_DIR / "plots" / "boxplot.png")
         fig.savefig(p)
@@ -1716,7 +1772,8 @@ class GCMSAgent:
         fig, ax = plt.subplots(figsize=(14, max(7, len(labels) * 0.4)))
         ratio.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.8)
         ax.set_ylabel('Composition [%]', fontsize=12)
-        ax.set_title(title or 'Amino Acid Composition Profile', fontsize=14, fontweight='bold')
+        if title:
+            ax.set_title(title, fontsize=14, fontweight='bold')
         ax.legend(fontsize=8, ncol=3, loc='upper right')
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=8)
         ax.set_ylim(0, 105)
@@ -1754,7 +1811,7 @@ class GCMSAgent:
         ax1.set_yticks(range(len(pd_df)))
         ax1.set_yticklabels(pd_df['label'], fontsize=7)
         ax1.set_xlabel('Total [g/100g]', fontsize=9)
-        ax1.set_title('Total AA per Sample', fontsize=11, fontweight='bold')
+        ax1.set_title('Total per Sample', fontsize=11, fontweight='bold')
 
         # (0,1:) Group comparison bar
         ax2 = fig.add_subplot(gs[0, 1:])
@@ -1762,7 +1819,7 @@ class GCMSAgent:
         top8 = self.df.groupby('compound')['conc_g100g'].mean().nlargest(8).index
         pm = gm[gm['compound'].isin(top8)].pivot(index='group', columns='compound', values='conc_g100g').fillna(0)
         pm.plot(kind='bar', ax=ax2, color=colors[:len(pm)], edgecolor='black', linewidth=0.5)
-        ax2.set_title('Major AA by Group', fontsize=11, fontweight='bold')
+        ax2.set_title('Major Compounds by Group', fontsize=11, fontweight='bold')
         ax2.legend(fontsize=8)
         ax2.tick_params(axis='x', rotation=15)
         ax2.grid(axis='y', alpha=0.3, linestyle='--')
@@ -1818,7 +1875,7 @@ class GCMSAgent:
                         sig_count += 1
 
         summary_lines = [
-            "=== GCMS Amino Acid Analysis ===",
+            "=== GCMS Compound Analysis ===",
             "",
             f"  Samples:        {self.df['sample'].nunique()}",
             f"  Records:        {len(self.df)}",
@@ -1836,7 +1893,8 @@ class GCMSAgent:
                 fontsize=9, fontfamily='monospace', verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='#fef9e7', edgecolor='#f39c12', alpha=0.9))
 
-        fig.suptitle(title or 'GCMS Analysis Dashboard', fontsize=15, fontweight='bold', y=1.01)
+        if title:
+            fig.suptitle(title, fontsize=15, fontweight='bold', y=1.01)
         p = str(OUTPUT_DIR / "plots" / "dashboard.png")
         fig.savefig(p, bbox_inches='tight', facecolor='white')
         plt.close(fig)
@@ -1980,7 +2038,7 @@ class GCMSAgent:
             dendrogram_ratio=(0.12, 0.12),
             xticklabels=True, yticklabels=True,
         )
-        g.ax_heatmap.set_title(f'Amino Acid {method.capitalize()} Correlation', fontsize=14, fontweight='bold', pad=20)
+        g.ax_heatmap.set_title(f'{method.capitalize()} Correlation', fontsize=14, fontweight='bold', pad=20)
         g.ax_heatmap.tick_params(labelsize=9)
 
         p = str(OUTPUT_DIR / "plots" / "correlation_heatmap.png")
@@ -2106,7 +2164,7 @@ class GCMSAgent:
             if not has_data:
                 suggestions.append({
                     "action": "Scan and extract data",
-                    "rationale": "No data loaded. Start by scanning the directory and extracting all amino acid data.",
+                    "rationale": "No data loaded. Start by scanning the directory and extracting all compound data.",
                     "steps": [
                         {"tool": "scan_data_directory", "params": {}},
                         {"tool": "extract_all_data", "params": {}},
@@ -2131,7 +2189,7 @@ class GCMSAgent:
             for i in range(min(n_groups - 1, 2)):
                 suggestions.append({
                     "action": f"Compare '{groups[i]}' vs '{groups[i+1]}'",
-                    "rationale": f"Compare the two groups to find significantly different amino acids.",
+                    "rationale": f"Compare the two groups to find significantly different compounds.",
                     "steps": [
                         {"tool": "compare_groups", "params": {"group_a": groups[i], "group_b": groups[i+1]}},
                         {"tool": "volcano_plot", "params": {"group_a": groups[i], "group_b": groups[i+1]}},
@@ -2148,7 +2206,7 @@ class GCMSAgent:
 
         if goal in ('compare', 'all') and n_compounds >= 5:
             suggestions.append({
-                "action": "Explore amino acid correlations",
+                "action": "Explore compound correlations",
                 "rationale": f"{n_compounds} compounds detected. Correlation analysis can reveal metabolic relationships.",
                 "tool": "correlation_heatmap",
                 "params": {"method": "pearson"}
@@ -2252,19 +2310,19 @@ class GCMSAgent:
         # --- Section 6: Key Findings Summary ---
         key_findings = []
 
-        # Most abundant amino acids
+        # Most abundant compounds
         mean_conc = self.df.groupby('compound')['conc_g100g'].mean().sort_values(ascending=False)
         key_findings.append({
-            "finding": "Most abundant amino acids",
+            "finding": "Most abundant compounds",
             "detail": f"Top 5: {', '.join(f'{c}({v:.4f})' for c, v in mean_conc.head(5).items())}",
         })
 
-        # Most variable amino acids
+        # Most variable compounds
         cv = self.df.groupby('compound')['conc_g100g'].agg(['mean', 'std'])
         cv['cv_pct'] = (cv['std'] / cv['mean'] * 100).fillna(0)
         top_cv = cv['cv_pct'].sort_values(ascending=False).head(3)
         key_findings.append({
-            "finding": "Most variable amino acids",
+            "finding": "Most variable compounds",
             "detail": f"Highest CV%: {', '.join(f'{c}({v:.0f}%)' for c, v in top_cv.items())}",
         })
 
@@ -2278,7 +2336,7 @@ class GCMSAgent:
                 )
                 key_findings.append({
                     "finding": "Significant group differences (FDR < 0.05)",
-                    "detail": f"{len(sig)} amino acids: {sig_detail}",
+                    "detail": f"{len(sig)} compounds: {sig_detail}",
                 })
 
         report["sections"]["key_findings"] = key_findings
@@ -2286,19 +2344,19 @@ class GCMSAgent:
         # --- Section 7: Reference Context ---
         references = [
             {
-                "topic": "OPA derivatization method",
-                "citation": "Roth, M. (1971). Fluorescence reaction for amino acids. Analytical Chemistry, 43(7), 880-882.",
-                "relevance": "Standard OPA pre-column derivatization method for amino acid analysis used in this study."
+                "topic": "GC-MS volatile compound analysis",
+                "citation": "SPME-GC-MS methodology for volatile flavor compound profiling. Solid-phase microextraction (SPME) coupled with gas chromatography-mass spectrometry.",
+                "relevance": "Standard SPME-GC-MS method for volatile organic compound analysis used in this study."
             },
             {
-                "topic": "Egg yolk amino acid composition",
-                "citation": "Nimalaratne, C., & Wu, J. (2015). Hen egg as an antioxidant food commodity: A review. Nutrients, 7(10), 8274-8293.",
-                "relevance": "Comprehensive review of egg yolk composition including amino acid profiles."
+                "topic": "Flavor chemistry and aroma compounds",
+                "citation": "Reineccius, G. (2006). Flavor Chemistry and Technology (2nd ed.). CRC Press.",
+                "relevance": "Comprehensive reference on flavor compound identification, formation pathways, and sensory characteristics."
             },
             {
-                "topic": "Amino acid analysis by HPLC",
-                "citation": "Fekkes, D., et al. (1995). Validation of the determination of amino acids in plasma by HPLC. Journal of Chromatography B, 669(2), 177-186.",
-                "relevance": "Method validation for amino acid quantification using automated pre-column derivatization."
+                "topic": "Mass spectral libraries and identification",
+                "citation": "Stein, S.E. (1999). An integrated method for spectrum extraction and compound identification from GC/MS data. J. Am. Soc. Mass Spectrom., 10(8), 770-781.",
+                "relevance": "NIST mass spectral library search methodology and match factor interpretation."
             },
             {
                 "topic": "Statistical comparison methods",
@@ -2311,14 +2369,9 @@ class GCMSAgent:
                 "relevance": "Cohen's d effect size thresholds (0.2 small, 0.5 medium, 0.8 large) used in this report."
             },
             {
-                "topic": "Egg yolk protein and amino acid nutrition",
-                "citation": "Kovacs-Nolan, J., et al. (2005). Advances in the value of eggs and egg components for human health. J. Agric. Food Chem., 53(22), 8421-8431.",
-                "relevance": "Nutritional and functional significance of egg yolk amino acid composition."
-            },
-            {
-                "topic": "Amino acid composition and food processing",
-                "citation": "Friedman, M. (1996). Nutritional value of proteins from different food sources. J. Agric. Food Chem., 44(1), 6-29.",
-                "relevance": "Effects of processing on amino acid composition and nutritional quality."
+                "topic": "Kovats retention index in GC-MS",
+                "citation": "van Den Dool, H., & Kratz, P.D. (1963). A generalization of the retention index system. J. Chromatogr. A, 11, 463-471.",
+                "relevance": "Kovats retention index system for compound identification confirmation in GC analysis."
             },
         ]
         report["sections"]["references"] = references
@@ -2342,7 +2395,7 @@ class GCMSAgent:
                 "n_significant": comparison.get("significant_fdr", 0) if group_a and group_b else 0,
             } if group_a and group_b else None,
             "reference_count": len(references),
-            "instruction": "Use this data and the references provided to compose a professional, publication-quality analysis report with biological interpretation. Cite the references where relevant. Discuss the nutritional and functional significance of the amino acid profiles. Compare findings with known literature values for egg yolk where applicable."
+            "instruction": "Use this data and the references provided to compose a professional, publication-quality analysis report with scientific interpretation. Cite the references where relevant. Discuss the chemical and functional significance of the identified compounds. Compare findings with known literature values for the relevant sample type where applicable."
         }, ensure_ascii=False)
 
     # --------------------------------------------------------
@@ -3004,7 +3057,7 @@ Next i
             "samples_before": int(samples_before),
             "samples_after": int(samples_after),
             "top_compounds_after_filter": [{"compound": c, "mean_area": round(float(a), 0)} for c, a in top10.items()],
-            "has_match_data": 'match_factor' in df.columns and df['match_factor'].notna().any(),
+            "has_match_data": bool('match_factor' in df.columns and df['match_factor'].notna().any()),
             "note": (
                 "Filtered data stored. Use generate_plots, compare_groups, etc. — they will use filtered data."
                 if filters_applied else
@@ -3071,6 +3124,8 @@ Next i
             mask = self.df['sample'] == sample
             count += mask.sum()
             self.df.loc[mask, 'group'] = group_name
+            # Store mapping for auto-apply to future batches
+            self._group_assignments[sample] = group_name
 
         # Show current groups
         current_groups = self.df.groupby('group')['sample'].nunique().to_dict()
@@ -3083,6 +3138,360 @@ Next i
             "current_groups": {str(k): int(v) for k, v in current_groups.items()},
             "note": f"Now {len(current_groups)} group(s) defined. Use compare_groups to compare them.",
         }, ensure_ascii=False)
+
+    def _rename_samples(self, mapping):
+        """Rename sample IDs to user-friendly display names.
+
+        Args:
+            mapping: Comma-separated key=value pairs, e.g.
+                     'Sample001.D=Raw-MP,Sample002.D=PB,Sample003.D=pH2-B'
+
+        Updates self.df['sample'] and stores self._sample_labels for reference.
+        All downstream plots and analyses will use the new names.
+        """
+        if self.df is None:
+            return json.dumps({"error": "No data loaded. Run extract_all_data first."}, ensure_ascii=False)
+
+        import re
+
+        # Initialize sample labels storage
+        if not hasattr(self, '_sample_labels'):
+            self._sample_labels = {}
+
+        renamed = []
+        not_found = []
+
+        for pair in mapping.split(','):
+            pair = pair.strip()
+            if not pair or '=' not in pair:
+                continue
+            orig, new = pair.split('=', 1)
+            orig = orig.strip()
+            new = new.strip()
+
+            # Skip empty
+            if not orig or not new:
+                continue
+
+            # Try exact match first
+            existing = self.df['sample'].unique()
+            matched = None
+
+            for es in existing:
+                if orig.lower() == es.lower():
+                    matched = es
+                    break
+                # Also try without .D suffix
+                if orig.lower().replace('.d', '') == es.lower().replace('.d', ''):
+                    matched = es
+                    break
+
+            if matched:
+                # Update DataFrame
+                mask = self.df['sample'] == matched
+                count = mask.sum()
+                self.df.loc[mask, 'sample'] = new
+                self._sample_labels[matched] = new
+                # Store mapping for auto-apply to future batches
+                orig_bare = orig.replace('.D', '').replace('.d', '')
+                self._rename_mapping[orig_bare] = new
+                self._rename_mapping[orig] = new
+                renamed.append(f"{matched} -> {new} ({count} rows)")
+
+                # Also update df_unfiltered if it exists
+                if hasattr(self, 'df_unfiltered') and self.df_unfiltered is not None:
+                    mask2 = self.df_unfiltered['sample'] == matched
+                    if mask2.any():
+                        self.df_unfiltered.loc[mask2, 'sample'] = new
+            else:
+                not_found.append(orig)
+
+        # Return summary
+        current_names = sorted(self.df['sample'].unique())
+        return json.dumps({
+            "status": "done",
+            "renamed": renamed,
+            "not_found": not_found if not_found else None,
+            "current_samples": current_names,
+            "mapping": self._sample_labels,
+            "note": f"{len(renamed)} sample(s) renamed. All plots will now use these display names."
+        }, ensure_ascii=False)
+
+    def _auto_apply_batch_mappings(self, batch_df):
+        """Apply stored rename and group mappings to a newly loaded batch DataFrame.
+
+        Uses a multi-strategy approach:
+        1. Exact name match
+        2. Case-insensitive match (stripping .D suffix)
+        3. Ordinal position match (1st sample in new batch = 1st in batch 1)
+           — handles different naming conventions between batches
+
+        Args:
+            batch_df: DataFrame from the new batch (with raw sample names)
+
+        Returns:
+            DataFrame with renamed samples and assigned groups
+        """
+        import pandas as pd
+        result = batch_df.copy()
+
+        # Apply sample renames using stored mapping
+        if self._rename_mapping:
+            new_samples = sorted(result['sample'].unique())
+            # Build ordered list of old→new mappings (sorted by old name for consistency)
+            old_to_new = sorted(self._rename_mapping.items(),
+                               key=lambda x: x[0].lower().replace('.d', ''))
+
+            matched_count = 0
+            for old_name, new_name in old_to_new:
+                # Strategy 1: exact match
+                mask = result['sample'] == old_name
+                if mask.any():
+                    result.loc[mask, 'sample'] = new_name
+                    matched_count += 1
+                    continue
+                # Strategy 2: case-insensitive, strip .D
+                matched = False
+                for sample in result['sample'].unique():
+                    a = old_name.lower().replace('.d', '')
+                    b = sample.lower().replace('.d', '')
+                    if a == b:
+                        result.loc[result['sample'] == sample, 'sample'] = new_name
+                        matched_count += 1
+                        matched = True
+                        break
+                    # Also try matching by numeric suffix (e.g., "Sample1" vs "Sample001")
+                    import re
+                    a_num = re.search(r'(\d+)', a)
+                    b_num = re.search(r'(\d+)', b)
+                    if a_num and b_num and int(a_num.group(1)) == int(b_num.group(1)):
+                        a_prefix = re.sub(r'\d+', '', a)
+                        b_prefix = re.sub(r'\d+', '', b)
+                        if a_prefix == b_prefix:
+                            result.loc[result['sample'] == sample, 'sample'] = new_name
+                            matched_count += 1
+                            matched = True
+                            break
+                if matched:
+                    continue
+
+            # Strategy 3: ordinal position matching (fallback if name-based failed)
+            if matched_count == 0 and len(new_samples) == len(old_to_new):
+                # Sort new samples by their names for deterministic ordering
+                new_sorted = sorted(new_samples, key=lambda x: x.lower().replace('.d', ''))
+                for i, new_name_val in enumerate(new_sorted):
+                    if i < len(old_to_new):
+                        target_name = old_to_new[i][1]  # the display name from batch 1
+                        mask = result['sample'] == new_name_val
+                        if mask.any():
+                            result.loc[mask, 'sample'] = target_name
+
+        # Apply group assignments using the renamed sample names
+        if self._group_assignments:
+            for sample_name, group_name in self._group_assignments.items():
+                mask = result['sample'] == sample_name
+                if mask.any():
+                    result.loc[mask, 'group'] = group_name
+
+        return result
+
+    def _load_replicate_batch(self, data_dir):
+        """Load a replicate experiment batch and merge with existing data.
+
+        This is the PRIMARY method for loading replicate experiments. It:
+        1. Extracts data from the new data directory
+        2. Auto-applies the same sample renames as batch 1
+        3. Auto-applies the same group assignments as batch 1
+        4. Concatenates with existing DataFrame
+        5. Updates df_unfiltered to span all batches
+
+        Args:
+            data_dir: Path to the replicate experiment's data directory
+
+        Returns:
+            JSON summary with batch info
+        """
+        import pandas as pd
+
+        if self.df is None or self._batch_count == 0:
+            return json.dumps({
+                "error": "No primary batch loaded. Run extract_all_data for batch 1 first.",
+                "hint": "Load batch 1 with extract_all_data, rename samples, set groups, then load replicates."
+            }, ensure_ascii=False)
+
+        if not self._rename_mapping:
+            return json.dumps({
+                "error": "Batch 1 samples have not been renamed yet.",
+                "hint": "Rename batch 1 samples first (rename_samples), then load the replicate batch.",
+                "current_samples": sorted(self.df['sample'].unique().tolist()),
+            }, ensure_ascii=False)
+
+        # Save current state
+        saved_df = self.df.copy()
+        saved_unfiltered = (self.df_unfiltered.copy()
+                           if hasattr(self, 'df_unfiltered') and self.df_unfiltered is not None
+                           else None)
+
+        new_batch_num = self._batch_count + 1
+
+        try:
+            # Extract data from new directory (this replaces self.df)
+            result = json.loads(self._extract_all_data(data_dir, batch=new_batch_num))
+
+            if "error" in result:
+                # Restore on failure
+                self.df = saved_df
+                self.df_unfiltered = saved_unfiltered
+                self._batch_count = max(self._batch_count, 1)
+                return json.dumps(result, ensure_ascii=False)
+
+            new_df = self.df  # _extract_all_data sets self.df to the new batch only
+
+            # Auto-apply mappings
+            new_df_mapped = self._auto_apply_batch_mappings(new_df)
+
+            # Concatenate with saved batch 1 data
+            self.df = pd.concat([saved_df, new_df_mapped], ignore_index=True)
+
+            # Handle df_unfiltered
+            if saved_unfiltered is not None:
+                new_unfiltered = (self.df_unfiltered.copy()
+                                  if hasattr(self, 'df_unfiltered') and self.df_unfiltered is not None
+                                  else new_df.copy())
+                new_unfiltered_mapped = self._auto_apply_batch_mappings(new_unfiltered)
+                self.df_unfiltered = pd.concat([saved_unfiltered, new_unfiltered_mapped],
+                                               ignore_index=True)
+            else:
+                self.df_unfiltered = self.df.copy()
+
+            self._batch_count = new_batch_num
+            if data_dir not in self._batch_dirs:
+                self._batch_dirs.append(data_dir)
+
+            # Summary
+            n_compounds = int(self.df['compound'].nunique())
+            new_rows = int((self.df['batch'] == new_batch_num).sum())
+            all_samples = sorted(self.df['sample'].unique().tolist())
+
+            return json.dumps({
+                "status": "success",
+                "batch": new_batch_num,
+                "data_dir": data_dir,
+                "new_records": new_rows,
+                "total_records": len(self.df),
+                "total_batches": self._batch_count,
+                "batch_dirs": self._batch_dirs,
+                "n_samples": int(self.df['sample'].nunique()),
+                "n_compounds": n_compounds,
+                "samples": all_samples,
+                "groups": self.df['group'].unique().tolist(),
+                "mapping_applied": len(self._rename_mapping),
+                "note": (
+                    f"Batch {new_batch_num} loaded and merged. "
+                    f"Auto-applied {len(self._rename_mapping)} sample renames. "
+                    f"Plots will now show error bars reflecting "
+                    f"{self._batch_count}-batch replicate variability."
+                ),
+            }, ensure_ascii=False)
+
+        except Exception as e:
+            # Restore on any error
+            self.df = saved_df
+            self.df_unfiltered = saved_unfiltered
+            self._batch_count = max(self._batch_count, 1)
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    def load_profile(self, profile_path):
+        """Load an experiment profile JSON file and auto-configure everything.
+
+        The profile is a JSON file with:
+        {
+          "name": "experiment name",
+          "samples": {"Sample001.D": "Raw-MP", ...},
+          "groups": {"GroupA": ["Raw-MP", ...], ...},
+          "batches": ["D:\\Tina", "D:\\Tina_batch2"],
+          "defaults": {"min_area": 10000, "exclude_unidentified": true, ...}
+        }
+
+        This method:
+        1. Loads each batch directory via extract_all_data
+        2. Renames samples
+        3. Assigns groups
+        4. Applies default filters
+        5. Returns JSON summary
+
+        Call this once at startup — then immediately start plotting.
+        """
+        import os as _os
+        try:
+            with open(profile_path, 'r', encoding='utf-8') as f:
+                profile = json.load(f)
+        except Exception as e:
+            return json.dumps({"error": f"Cannot read profile: {e}"}, ensure_ascii=False)
+
+        batches = profile.get("batches", [])
+        if not batches:
+            return json.dumps({"error": "Profile has no 'batches' list"}, ensure_ascii=False)
+
+        sample_map = profile.get("samples", {})
+        group_map = profile.get("groups", {})
+        defaults = profile.get("defaults", {})
+        results = {"batches_loaded": 0, "samples_renamed": 0, "groups_assigned": 0,
+                   "filters_applied": [], "errors": []}
+
+        # Load batch 1
+        batch1_dir = batches[0]
+        if not _os.path.isdir(batch1_dir):
+            return json.dumps({"error": f"Batch 1 directory not found: {batch1_dir}"},
+                            ensure_ascii=False)
+
+        r1 = json.loads(self._extract_all_data(batch1_dir, batch=1))
+        if "error" in r1:
+            return json.dumps(r1, ensure_ascii=False)
+        results["batches_loaded"] = 1
+
+        # Rename samples
+        if sample_map:
+            mapping_str = ','.join(f"{k}={v}" for k, v in sample_map.items())
+            rr = json.loads(self._rename_samples(mapping_str))
+            results["samples_renamed"] = len(rr.get("renamed", []))
+
+        # Assign groups
+        if group_map:
+            for group_name, members in group_map.items():
+                member_str = ','.join(members)
+                self._set_groups(group_name, member_str)
+                results["groups_assigned"] += 1
+
+        # Load additional batches
+        for i, batch_dir in enumerate(batches[1:], start=2):
+            if not _os.path.isdir(batch_dir):
+                results["errors"].append(f"Batch {i} dir not found: {batch_dir}")
+                continue
+            rb = json.loads(self._load_replicate_batch(batch_dir))
+            if rb.get("status") == "success":
+                results["batches_loaded"] = i
+
+        # Apply default filters
+        if defaults:
+            min_a = defaults.get("min_area", 10000)
+            excl_uid = defaults.get("exclude_unidentified", True)
+            excl_cont = defaults.get("exclude_contaminants", True)
+            rf = json.loads(self._filter_data(
+                min_area=min_a,
+                exclude_unidentified=excl_uid,
+                exclude_contaminants=excl_cont
+            ))
+            results["filters_applied"] = rf.get("filters_applied", [])
+
+        results["status"] = "success"
+        results["name"] = profile.get("name", "")
+        results["total_records"] = len(self.df) if self.df is not None else 0
+        n_comp = int(self.df['compound'].nunique()) if self.df is not None else 0
+        results["compounds"] = n_comp
+        results["note"] = "Profile loaded. Ready to plot — just use /plot or type your request."
+
+        return json.dumps(results, ensure_ascii=False)
 
     def _match_spectra_library(self, min_match=600):
         """Match detected peaks against spectral library using REAL mass spectra.
@@ -4490,11 +4899,12 @@ You call tools to obtain data, then interpret results with proper chemical and s
 
 ### Standard workflow after data is loaded:
 1. `extract_all_data` → get all data (auto-filters area >= 10,000, built-in library match)
-2. **ALWAYS ask about groups**: "需要分组吗？" → use `set_groups` tool
-3. **ALWAYS suggest RI calibration**: "有烷烃标准品数据吗？可以用 `/ri` 做保留指数校准，鉴定更准。"
-4. `calibrate_ri` → if user has alkane standard → builds RT→RI curve for all peaks
-5. `filter_data` → **ALWAYS ask about filters** before plotting
-6. `quality_report` → assess data quality
+2. **ALWAYS rename samples first**: Ask user "Sample001.D 叫什么名字？" → use `rename_samples` with user-provided names. CRITICAL: do this BEFORE any plots or reports, otherwise plots will show ugly default names like Sample001.D. The mapping format is: 'Sample001.D=Raw-MP,Sample002.D=PB,...'
+3. **ALWAYS ask about groups**: "需要分组吗？" → use `set_groups` tool
+4. **ALWAYS suggest RI calibration**: "有烷烃标准品数据吗？可以用 `/ri` 做保留指数校准，鉴定更准。"
+5. `calibrate_ri` → if user has alkane standard → builds RT→RI curve for all peaks
+6. `filter_data` → **ALWAYS ask about filters** before plotting
+7. `quality_report` → assess data quality
 7. **For compound identification — use the BEST tool for the situation**:
    - **With RI data**: `identify_with_ri` → MS+RI dual-dimension, produces 'confirmed'/'high'/'probable'
    - **Without RI data**: `search_public_libraries` → MS-only cosine matching
@@ -4530,6 +4940,18 @@ When identifying compounds, follow this priority:
 
 4. **Re-filter when needed**: Re-call `filter_data` whenever user changes criteria.
 
+### Replicate Experiments (Multiple Batches)
+When the user has repeated the same experiment with identical samples:
+- **ALWAYS ask after loading batch 1**: "还有其他重复实验的数据吗？如果有，可以用 /batch 加载，这样 error bar 会反映批间变异。"
+- Loading workflow:
+  1. Load batch 1: `extract_all_data` → `rename_samples` → `set_groups`
+  2. Load batch 2+: `/batch <directory>` or call `load_replicate_batch` directly
+  3. The agent auto-applies the same sample names and group assignments
+  4. All plots will now show error bars reflecting batch-to-batch variability
+  5. `compare_groups` will have more statistical power with double the observations
+- `load_replicate_batch` auto-reuses the rename and group mappings from batch 1
+- If the user hasn't renamed samples yet, remind them to rename first before loading replicates
+
 ### Retention Index (RI) Auto-Calibration
 The agent can auto-calibrate Kovats RI using an alkane standard (C8-C30):
 - Use `calibrate_ri` tool or `/ri` shortcut
@@ -4544,6 +4966,11 @@ The agent can auto-calibrate Kovats RI using an alkane standard (C8-C30):
 
 ### CRITICAL: Ask before generating plots!
 - **NEVER call generate_plots with plot_type='all' without asking the user first.**
+- **ALWAYS ask about chart title and axis labels before plotting.** Do NOT use default titles like "Compound Concentration" — ask the user:
+  - "图的标题是什么？" (e.g., "微藻蛋白风味化合物对比")
+  - "横坐标标签是什么？" (e.g., "挥发性风味化合物" or leave blank)
+  - "纵坐标标签是什么？" (e.g., "峰面积响应值" or "相对含量 [%]")
+- Pass the user's answers as the `title` parameter to generate_plots.
 - Each plot type serves a different purpose — let the user choose:
   - `bar` — group comparison with significance brackets (best for 2-3 groups)
   - `heatmap` — hierarchical clustering overview (best for >10 samples)
@@ -4554,7 +4981,7 @@ The agent can auto-calibrate Kovats RI using an alkane standard (C8-C30):
   - `dashboard` — 6-panel summary (comprehensive, large file)
   - `all` — everything (only when user explicitly requests)
 - When user says "/plot" without specifying, ask: "需要哪种图？bar(组间对比) / pca(样本分组) / heatmap(聚类热图) / volcano(火山图) / dashboard(总览) / all(全部)？"
-- When user says "/plot bar" or "/plot pca", generate ONLY that type.
+- When user says "/plot bar" or "/plot pca", generate ONLY that type, but STILL ask about title/labels first if not provided.
 
 ### Flavor/Aroma Compound Knowledge
 - Common flavor-active volatiles: aldehydes (hexanal, nonanal, benzaldehyde), ketones (2-heptanone, 2-nonanone), alcohols (1-octen-3-ol, linalool), esters, terpenes (limonene, pinene), pyrazines, sulfur compounds
@@ -4800,6 +5227,8 @@ def main():
     parser = argparse.ArgumentParser(description="GCMS .D Data AI Agent")
     parser.add_argument("--data-dir", "-d", type=str, default=None,
                        help="Data directory containing .D folders")
+    parser.add_argument("--profile", "-p", type=str, default=None,
+                       help="Experiment profile JSON file (auto-loads samples, groups, batches)")
     parser.add_argument("--model", "-m", type=str, default=None,
                        help="DeepSeek model: deepseek-chat / deepseek-reasoner")
     args = parser.parse_args()
@@ -4858,12 +5287,41 @@ def main():
     print(f"  [OK] Agent ready  |  Model: {agent.model}")
     print(f"  Data: {agent.data_dir}")
     print(f"  Output: {OUTPUT_DIR}")
+
+    # --- Profile loading ---
+    profile_path = args.profile
+    if not profile_path:
+        # Auto-detect profile.json in data directory
+        auto_profile = os.path.join(data_dir, "profile.json")
+        if os.path.exists(auto_profile):
+            profile_path = auto_profile
+
+    if profile_path and os.path.exists(profile_path):
+        print(f"\n  📋 Loading experiment profile: {profile_path}")
+        try:
+            result = agent.load_profile(profile_path)
+            r = json.loads(result)
+            if r.get("status") == "success":
+                print(f"  [OK] {r.get('batches_loaded', 0)} batch(es) loaded")
+                print(f"       {r.get('samples_renamed', 0)} samples renamed")
+                print(f"       {r.get('groups_assigned', 0)} groups assigned")
+                if r.get("filters_applied"):
+                    print(f"       Filters: {', '.join(r['filters_applied'])}")
+            else:
+                print(f"  [WARN] Profile error: {r.get('error', 'unknown')}")
+        except Exception as e:
+            print(f"  [WARN] Profile load failed: {e}")
+    elif profile_path:
+        print(f"\n  [WARN] Profile not found: {profile_path}")
+
     print()
     print("  Quick start:")
     print("    /scan      Scan data directory")
     print("    /check     Check files inside .D folders")
     print("    /run       Extract data (auto peak detection + library matching)")
     print("    /groups    Assign samples to experimental groups")
+    print("    /rename    Rename samples (Sample001.D → Raw-MP)")
+    print("    /batch     Load replicate experiment for error bars")
     print("    /filter    Filter data by area, match quality, compounds")
     print("    /plot bar  Generate bar chart (or pca/heatmap/volcano/dashboard)")
     print("    /identify  Identify unknown peaks (12K spectra + online)")
@@ -4904,6 +5362,8 @@ def main():
     /check     Check files inside .D folders
     /run       Extract data (auto peak detection + library matching)
     /groups    Assign samples to groups (e.g., /groups Control 1-8)
+    /rename    Rename samples (Sample001.D → Raw-MP)
+    /batch     Load replicate batch for error bars
     /filter    Filter data (area, match quality, compounds)
     /plot      Choose plot type (bar/pca/heatmap/volcano/dashboard/all)
     /plot bar  Generate bar chart only (or pca/heatmap/boxplot/volcano)
@@ -4959,9 +5419,19 @@ def main():
 
         if ui.lower() == '/status':
             if agent.df is not None:
+                batch_info = ""
+                if hasattr(agent, '_batch_count') and agent._batch_count > 0:
+                    batch_info = f" | {agent._batch_count} batch(es)"
+                    if agent._batch_count > 1:
+                        batch_info += f" ({agent._batch_dirs})"
                 print(f"\n  {len(agent.df)} records | {agent.df['sample'].nunique()} samples | "
-                      f"{agent.df['compound'].nunique()} compounds")
+                      f"{agent.df['compound'].nunique()} compounds{batch_info}")
                 print(f"  Groups: {', '.join(agent.df['group'].unique())}")
+                if 'batch' in agent.df.columns:
+                    for b in sorted(agent.df['batch'].unique()):
+                        n = int((agent.df['batch'] == b).sum())
+                        s = int(agent.df[agent.df['batch'] == b]['sample'].nunique())
+                        print(f"    Batch {int(b)}: {s} samples, {n} records")
             elif agent.d_folders:
                 print(f"\n  Scanned: {agent.d_folders.get('total', 0)} folders")
             else:
@@ -4974,12 +5444,16 @@ def main():
             '/check': "Check what files are in the .D folders and recommend next steps",
             '/run': "Extract all data from available reports. If TIC CSV data is found (MassHunter GC-MS), automatically detect peaks and integrate with min_area=10000 filter. Otherwise use CSV/TXT/XLS reports. Auto-match against built-in MSP library and flavor compound library.",
             '/groups': "Ask the user to assign samples to experimental groups (e.g., 'Control' = samples 1-8, 'Treatment' = samples 9-16). Then use set_groups for each group.",
+            '/rename': "Rename samples from default IDs to user-friendly display names. Ask: '需要修改样品名吗？例如把 Sample001.D 改成 Raw-MP？' Then use rename_samples with the mapping. ALL samples should be renamed before plotting.",
+            '/batch': "Load a replicate experiment batch. Ask the user for the data directory path. Then use load_replicate_batch with the provided directory. IMPORTANT: batch 1 samples must be renamed and grouped first! After loading, all plots will show error bars reflecting batch-to-batch variability.",
+            '/profile': "Load (or reload) an experiment profile JSON file. Ask user for the path, then call load_profile. If user says '/profile save', save current state as a profile file for future one-click loading.",
             '/filter': "Filter the current dataset. Ask: what min_area? what min_match? which compounds to exclude? Auto-suggest excluding siloxanes and RT-only peaks.",
             '/plot': "Ask the user which plot(s) to generate: bar (group comparison), heatmap (clustered), pca (score+loading), boxplot (distribution), composition (stacked ratio), volcano (group diff), dashboard (6-panel overview), or all. Then generate only the requested type.",
             '/export': "Show me how to export NIST library search results from MassHunter Qualitative Analysis (to get compound names and match factors)",
             '/peaks': "Run peak detection on the loaded chromatographic data",
             '/library': "Show current status of open-source spectral libraries. If no libraries downloaded, offer to download MassBank EU and NIST WebBook (free, no registration). Then show how to use search_public_libraries.",
             '/identify': "Use search_public_libraries tool with search_type='all' to identify all currently unidentified peaks (RT_* labels) using free public spectral libraries (MoNA + MassBank + NIST WebBook + built-in MSP). Include live MoNA API search.",
+            '/jcamp': "Load JCAMP-DX mass spectral files from D: drive. Scan D:\\ for all .jdx/.jcamp/.dx files, copy them to public_libraries/, and reload the spectral library manager so they become searchable. Use this whenever the user has exported new JCAMP spectra from their instrument software.",
             '/id': "NIST-style MS+RI dual-dimension identification. Use identify_with_ri to combine cosine MS matching + retention index cross-validation. Produces confidence levels: confirmed/high/probable/tentative. This is the PRIMARY identification tool when RI data is available.",
             '/ri': "Auto-calibrate Kovats Retention Index for all peaks using alkane standard. If user has alkane data (C8-C30), detect alkanes, build RT→RI curve, calculate RI for all peaks, cross-reference with 1498-entry RI database. Or ask user for alkane sample name.",
             '/report': "Generate a comprehensive professional analysis report with biological interpretation, statistical analysis, and scientific references.",

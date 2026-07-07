@@ -38,3 +38,10 @@ public_libraries/ri_expansion_state.json
 
 # msconvert path reference (local install)
 tools/msconvert.exe.path
+
+# JCAMP-DX exports from NIST (regeneratable, large)
+public_libraries/*.jdx
+public_libraries/*.jcamp
+
+# Experiment profiles (may contain local paths)
+profile.json
