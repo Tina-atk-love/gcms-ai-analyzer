@@ -323,3 +323,193 @@ def identify_compound(observed_ions, library=None, min_match=600,
     if results:
         return results[0]
     return None
+
+
+# ================================================================
+# NIST-Style Mirror Plot
+# ================================================================
+def mirror_plot(observed_ions, reference_ions, ref_name='Reference',
+                output_path=None, title=None, figsize=(10, 6)):
+    """Generate NIST-style mirror plot comparing observed vs reference spectrum.
+
+    Reference spectrum plotted upward (positive), observed downward (negative).
+    This is the standard visualization used by NIST MS Search for visual inspection
+    of spectral match quality.
+
+    Args:
+        observed_ions: [(mz, intensity), ...] — experimental spectrum
+        reference_ions: [(mz, intensity), ...] — library reference spectrum
+        ref_name: label for the reference compound
+        output_path: save path (default: output/agent_results/plots/mirror_{name}.png)
+        title: plot title
+        figsize: figure size in inches
+
+    Returns:
+        dict with status and file path
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Normalize both to base peak = 100
+    ref_mz = np.array([r[0] for r in reference_ions])
+    ref_int = np.array([r[1] for r in reference_ions], dtype=float)
+    obs_mz = np.array([o[0] for o in observed_ions])
+    obs_int = np.array([o[1] for o in observed_ions], dtype=float)
+
+    if ref_int.max() > 0:
+        ref_int = ref_int / ref_int.max() * 100
+    if obs_int.max() > 0:
+        obs_int = obs_int / obs_int.max() * 100
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Reference: upward stem plot
+    ax.stem(ref_mz, ref_int, linefmt='#1a5276', markerfmt='none', basefmt='none')
+    ax.scatter(ref_mz, ref_int, c='#1a5276', s=15, zorder=5, label=f'{ref_name} (ref)')
+
+    # Observed: downward stem plot
+    ax.stem(obs_mz, -obs_int, linefmt='#c0392b', markerfmt='none', basefmt='none')
+    ax.scatter(obs_mz, -obs_int, c='#c0392b', s=15, zorder=5, label='Observed')
+
+    # Zero line
+    ax.axhline(y=0, color='black', linewidth=0.8)
+
+    # Calculate match factor
+    from public_library_manager import cosine_similarity_forward, cosine_similarity_reverse
+    mf_fwd = cosine_similarity_forward(observed_ions, reference_ions)
+    mf_rev = cosine_similarity_reverse(observed_ions, reference_ions)
+
+    # Labels
+    ax.set_xlabel('m/z', fontsize=12)
+    ax.set_ylabel('Relative Abundance (%)', fontsize=12)
+    t = title or f'Mirror Plot: {ref_name}'
+    ax.set_title(f'{t}\nMatch: Fwd={mf_fwd} | Rev={mf_rev}',
+                 fontsize=13, fontweight='bold')
+    ax.legend(fontsize=10, loc='upper right')
+    ax.set_ylim(-110, 110)
+    ax.grid(True, alpha=0.2)
+
+    # Save
+    if output_path is None:
+        import os
+        os.makedirs('output/agent_results/plots', exist_ok=True)
+        safe_name = ref_name.replace('/', '_').replace('\\', '_')[:40]
+        output_path = f'output/agent_results/plots/mirror_{safe_name}.png'
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches='tight')
+    plt.close()
+
+    return {
+        'status': 'done',
+        'file': output_path,
+        'match_forward': mf_fwd,
+        'match_reverse': mf_rev,
+        'note': f'Mirror plot saved. Forward={mf_fwd}, Reverse={mf_rev}.'
+    }
+
+
+# ================================================================
+# Batch Parallel Search
+# ================================================================
+def batch_identify_unknowns(df, library_manager, data_dirs=None,
+                            min_match=600, max_per_sample=20, n_workers=4):
+    """Identify all unknown (RT_*) peaks across samples in parallel.
+
+    Args:
+        df: DataFrame with compound data
+        library_manager: PublicLibraryManager instance
+        data_dirs: dict mapping sample_name → .D directory path
+        min_match: minimum match factor
+        max_per_sample: max unknown peaks to search per sample
+        n_workers: parallel workers
+
+    Returns:
+        list of identification results with compound, sample, match info
+    """
+    import numpy as np
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from pathlib import Path
+
+    unknowns = df[df['compound'].str.startswith('RT_', na=False)]
+    if unknowns.empty:
+        return []
+
+    # Group by sample
+    tasks = []
+    for sample in unknowns['sample'].unique()[:8]:
+        sdf = unknowns[unknowns['sample'] == sample]
+        peaks = sdf[['compound', 'rt']].drop_duplicates()
+        for _, row in peaks.head(max_per_sample).iterrows():
+            tasks.append((sample, row['compound'], row['rt']))
+
+    def search_one(task):
+        sample, compound, rt = task
+        # Find data.ms path
+        d_path = None
+        if data_dirs and sample in data_dirs:
+            d_path = Path(data_dirs[sample])
+        else:
+            for pattern in [f'{sample}', f'{sample}.D']:
+                for base in [Path('.'), Path('D:/Tina')]:
+                    p = base / pattern
+                    if (p / 'data.ms').exists():
+                        d_path = p
+                        break
+
+        # Extract spectrum
+        ions = []
+        if d_path and (d_path / 'data.ms').exists():
+            try:
+                from aston.tracefile.agilent_ms import AgilentMS
+                reader = AgilentMS(str(d_path / 'data.ms'))
+                # Get scan at RT
+                times = np.array(reader.data.traces[0].index)
+                # time unit detection: if max > 100 → ms, else → min
+                if times.max() > 100:
+                    times = times / 60000
+                scan_idx = np.argmin(np.abs(times - rt))
+                # Get spectrum from CSR matrix
+                V = reader.data.values
+                import scipy.sparse
+                row = V[scan_idx]
+                if scipy.sparse.issparse(row):
+                    row = row.toarray().ravel()
+                traces = reader.data.traces
+                for i in np.where(row > 0)[0]:
+                    ions.append((float(traces[i].name), float(row[i])))
+            except Exception:
+                pass
+
+        if not ions or len(ions) < 3:
+            return {'compound': compound, 'sample': sample, 'rt': rt,
+                    'match_factor': 0, 'best_match': None, 'error': 'no_spectrum'}
+
+        # Search
+        results = library_manager.search_by_spectrum(ions, min_match=min_match, max_results=3)
+        best = results[0] if results else None
+
+        return {
+            'compound': compound, 'sample': sample, 'rt': rt,
+            'match_factor': best['match_factor'] if best else 0,
+            'best_match': best['name'] if best else None,
+            'cas': best.get('cas', '') if best else '',
+            'all_matches': results[:3],
+            'n_ions': len(ions),
+        }
+
+    # Run in parallel
+    results = []
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        futures = {executor.submit(search_one, t): t for t in tasks}
+        for future in as_completed(futures):
+            try:
+                results.append(future.result())
+            except Exception as e:
+                results.append({'error': str(e)})
+
+    results.sort(key=lambda x: x.get('match_factor', 0), reverse=True)
+    return results
+    return None

@@ -1515,6 +1515,159 @@ class PublicLibraryManager:
         """Reload all libraries and rebuild the in-memory cache."""
         return self.load_all(include_downloaded=True)
 
+    # ================================================================
+    # External NIST Library Support (user-provided path, no redistribution)
+    # ================================================================
+    def set_nist_path(self, nist_dir):
+        """Configure external NIST library directory.
+
+        The directory should contain JCAMP-DX (.jdx/.jcamp) or MSP (.msp)
+        files exported from the user's licensed NIST library.
+
+        Files are READ from their original location — nothing is copied.
+        This keeps the NIST data off GitHub and within the user's license terms.
+
+        Args:
+            nist_dir: path to directory containing NIST JCAMP/MSP files
+
+        Returns:
+            dict with file count and total entries found
+        """
+        import os as _os
+        path = Path(nist_dir)
+        if not path.exists():
+            return {'error': f'Directory not found: {nist_dir}', 'nist_path': str(path)}
+
+        # Scan for JCAMP and MSP files
+        jcamp_files = list(path.glob('*.jdx')) + list(path.glob('*.jcamp')) + list(path.glob('*.dx'))
+        msp_files = list(path.glob('*.msp')) + list(path.glob('*.MSP'))
+
+        all_files = jcamp_files + msp_files
+        if not all_files:
+            return {
+                'error': f'No .jdx/.jcamp/.msp files found in {nist_dir}',
+                'nist_path': str(path),
+                'hint': 'Export JCAMP-DX files from NIST MS Search and place them in this directory.'
+            }
+
+        self.nist_path = str(path)
+        self._nist_files = [str(f) for f in all_files]
+
+        return {
+            'nist_path': str(path),
+            'jcamp_files': len(jcamp_files),
+            'msp_files': len(msp_files),
+            'total_files': len(all_files),
+            'note': f'Found {len(all_files)} spectrum files. Call load_nist_library() to index them.'
+        }
+
+    def load_nist_library(self):
+        """Index NIST library files from the configured external path.
+
+        Loads JCAMP and MSP files from the user-specified NIST directory.
+        Entries are tagged with source='nist_local' to distinguish from
+        open-source libraries.
+
+        Returns:
+            dict with entry count and stats
+        """
+        if not hasattr(self, 'nist_path') or not self.nist_path:
+            return {'error': 'NIST path not set. Call set_nist_path() first.'}
+
+        nist_entries = []
+        for fpath in self._nist_files:
+            suffix = Path(fpath).suffix.lower()
+            try:
+                if suffix in ('.jdx', '.jcamp', '.dx'):
+                    entries = parse_jcamp_file(fpath)
+                    for e in entries:
+                        e['source'] = 'nist_local'
+                        e['source_file'] = str(Path(fpath).name)
+                elif suffix == '.msp':
+                    entries = parse_msp_file(fpath)
+                    for e in entries:
+                        e['source'] = 'nist_local'
+                        e['source_file'] = str(Path(fpath).name)
+                else:
+                    continue
+                nist_entries.extend(entries)
+            except Exception as e:
+                print(f'  [WARN] Failed to load {Path(fpath).name}: {e}')
+
+        # Index NIST entries separately (don't dedup against open-source)
+        self._nist_entries = nist_entries
+        self._nist_name_index = defaultdict(list)
+        self._nist_base_peak_index = defaultdict(list)
+
+        for i, entry in enumerate(nist_entries):
+            if 'peaks' not in entry or len(entry.get('peaks', [])) < 3:
+                continue
+            name = entry.get('name', '')
+            peaks = entry['peaks']
+            base_peak_mz = int(max(peaks, key=lambda p: p[1])[0])
+            self._nist_name_index[name].append(i)
+            self._nist_base_peak_index[base_peak_mz].append(i)
+
+        n_ri = sum(1 for e in nist_entries if e.get('ri_exp'))
+        return {
+            'nist_entries': len(nist_entries),
+            'with_ri': n_ri,
+            'note': f'Indexed {len(nist_entries)} NIST spectra ({n_ri} with RI). Call search_nist_library() to search.'
+        }
+
+    def search_nist_library(self, observed_ions, min_match=600, max_results=20):
+        """Search ONLY the user's local NIST library.
+
+        Args:
+            observed_ions: list of (mz, intensity) tuples
+            min_match: minimum match factor 0-999
+            max_results: max hits
+
+        Returns:
+            list of match results
+        """
+        if not hasattr(self, '_nist_entries') or not self._nist_entries:
+            return []
+
+        # Pre-filter by base peak
+        sorted_obs = sorted(observed_ions, key=lambda x: x[1], reverse=True)
+        top_5_mz = set(int(x[0]) for x in sorted_obs[:5])
+
+        candidate_indices = set()
+        for mz in top_5_mz:
+            if mz in self._nist_base_peak_index:
+                candidate_indices.update(self._nist_base_peak_index[mz])
+            for delta in (-1, 1):
+                if (mz + delta) in self._nist_base_peak_index:
+                    candidate_indices.update(self._nist_base_peak_index[mz + delta])
+
+        if not candidate_indices:
+            candidate_indices = range(len(self._nist_entries))
+
+        results = []
+        for idx in candidate_indices:
+            entry = self._nist_entries[idx]
+            mf_forward = cosine_similarity_forward(observed_ions, entry['peaks'])
+            mf_reverse = cosine_similarity_reverse(observed_ions, entry['peaks'])
+            combined_mf = int((mf_forward + mf_reverse) / 2)
+
+            if combined_mf >= min_match:
+                results.append({
+                    'name': entry['name'],
+                    'cas': entry.get('cas', ''),
+                    'formula': entry.get('formula', ''),
+                    'match_factor': combined_mf,
+                    'match_forward': mf_forward,
+                    'match_reverse': mf_reverse,
+                    'ri_exp': entry.get('ri_exp'),
+                    'source': 'nist_local',
+                    'source_file': entry.get('source_file', ''),
+                    'n_ref_peaks': len(entry['peaks']),
+                })
+
+        results.sort(key=lambda x: x['match_factor'], reverse=True)
+        return results[:max_results]
+
 
 # ============================================================
 # Singleton convenience

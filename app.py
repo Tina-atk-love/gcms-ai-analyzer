@@ -79,6 +79,24 @@ with st.sidebar:
 
     st.divider()
 
+    # NIST Library (optional)
+    st.markdown("### 🔬 NIST Library (Optional)")
+    st.caption("Point to your licensed NIST JCAMP files. Spectra stay on your machine.")
+    nist_path = st.text_input("NIST library path", value="", placeholder="D:\\NIST_JCAMP",
+                              help="Directory containing .jdx/.msp files exported from NIST MS Search")
+    if nist_path and st.button("📂 Index NIST Library", use_container_width=True):
+        if st.session_state.agent:
+            with st.spinner(f"Scanning {nist_path}..."):
+                r = json.loads(st.session_state.agent._set_nist_path(nist_path))
+                if 'error' not in r:
+                    st.info(f"Found {r.get('total_files',0)} files")
+                    r2 = json.loads(st.session_state.agent._load_nist_library())
+                    st.success(f"Indexed {r2.get('nist_entries',0)} NIST spectra ({r2.get('with_ri',0)} with RI)")
+                else:
+                    st.warning(r['error'])
+
+    st.divider()
+
     # Data source
     st.markdown("### 📂 Data Source")
     data_source = st.radio("Load from:", ["Local Directory", "Upload .D ZIP", "Demo Data"])

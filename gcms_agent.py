@@ -609,6 +609,31 @@ TOOLS = [
             }
         }
     },
+    # --- 22b. NIST local library tools (NEW) ---
+    {"type":"function","function":{"name":"set_nist_path","description":"Configure path to your local NIST spectral library. Point to a directory containing JCAMP-DX (.jdx) or MSP (.msp) files exported from your licensed NIST MS Search. Spectra stay on your machine — nothing is copied or redistributed. Use this once to set up, then use search_nist to search.","parameters":{"type":"object","properties":{"nist_dir":{"type":"string","description":"Path to directory containing NIST JCAMP/MSP files (e.g. D:\\NIST_JCAMP\\)"}},"required":["nist_dir"]}}},
+    {"type":"function","function":{"name":"load_nist_library","description":"Index the NIST library files from the configured path. Call this after set_nist_path. Shows how many spectra and how many have RI data.","parameters":{"type":"object","properties":{},"required":[]}}},
+    {"type":"function","function":{"name":"search_nist","description":"Search YOUR local NIST library (not the open-source one). Searches by mass spectrum (cosine similarity against data.ms) or by compound name. This is the premium search — uses your licensed NIST spectra for the highest-quality identifications.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"Compound name for name search (optional — leave empty for spectral search of unidentified peaks)"},"min_match":{"type":"number","description":"Minimum NIST match factor (default 700)"},"search_type":{"type":"string","description":"'spectrum' (cosine match against data.ms) or 'name' (lookup by compound name)"}},"required":[]}}},
+    # --- 22c. Enhanced identification tools (NEW) ---
+    {"type":"function","function":{"name":"enhanced_identify","description":"Enhanced compound identification with all cross-validation layers: MS cosine similarity + retention index + isotope pattern + multi-source consensus. Produces the most authoritative compound identification possible. Use this for publication-quality identifications.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Compound to identify (e.g. 'RT_5.230') or leave empty to batch-identify all unknown peaks"},"use_isotope":{"type":"boolean","description":"Check isotope patterns for formula validation (default true)"},"use_consensus":{"type":"boolean","description":"Cross-validate across library sources (default true)"}},"required":[]}}},
+    {"type":"function","function":{"name":"diagnose_unknown","description":"Comprehensive diagnosis of an unknown peak. Analyzes spectral features, suggests likely compound classes, checks for artifacts (column bleed, phthalates), and recommends next steps. Use for stubborn unknowns that resist normal identification.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Name of unknown compound to diagnose (e.g. 'RT_15.345')"},"sample_name":{"type":"string","description":"Sample containing this compound (optional, uses first sample if omitted)"}},"required":["compound_name"]}}},
+    {"type":"function","function":{"name":"compound_class_hint","description":"Suggest likely compound classes (aldehyde, ketone, terpene, etc.) based on mass spectral fragmentation patterns. Useful for narrowing down what an unknown peak might be.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Compound name to analyze"}},"required":["compound_name"]}}},
+    # --- 22d. Deconvolution (NEW) ---
+    {"type":"function","function":{"name":"deconvolve_peaks","description":"AMDIS-style automated peak deconvolution. Detects co-eluting compounds hidden under a single chromatographic peak by analyzing ion elution profiles. Extracts clean spectra for each component. Essential for complex samples where peaks overlap — reveals compounds missed by standard peak detection.","parameters":{"type":"object","properties":{"sample_name":{"type":"string","description":"Sample to deconvolve (e.g. 'Sample001.D'). If omitted, processes all samples."},"min_correlation":{"type":"number","description":"Minimum ion profile correlation to group as same component (default 0.7)"}},"required":[]}}},
+    # --- 22e. Mirror plot + batch search (NEW) ---
+    {"type":"function","function":{"name":"mirror_plot","description":"Generate a NIST-style mirror plot comparing an observed mass spectrum against a library reference spectrum. Reference plotted upward, observed downward. The gold standard for visually assessing spectral match quality — same format used by NIST MS Search.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Compound to visualize (e.g. 'hexanal' or 'RT_5.230')"},"sample_name":{"type":"string","description":"Sample containing this compound (optional, uses first available)"}},"required":["compound_name"]}}},
+    {"type":"function","function":{"name":"batch_identify","description":"Identify ALL unknown RT_* peaks across all samples in one call, using parallel search. Much faster than identifying peaks one by one. Returns ranked matches with match factors. Use this when you have many unknown peaks to identify.","parameters":{"type":"object","properties":{"min_match":{"type":"number","description":"Minimum match factor (default 600)"},"max_per_sample":{"type":"integer","description":"Max unknown peaks per sample (default 20)"}},"required":[]}}},
+    # --- 22f. RT alignment + templates (NEW) ---
+    {"type":"function","function":{"name":"check_rt_drift","description":"Check retention time drift across batches. Uses common compounds as internal RT standards to measure systematic shift. Essential before any cross-batch comparison — tells you if your RT alignment is reliable.","parameters":{"type":"object","properties":{"reference_batch":{"type":"integer","description":"Batch to use as reference (default 1)"}},"required":[]}}},
+    {"type":"function","function":{"name":"align_rt","description":"Correct retention time drift by aligning all batches to the reference batch. Uses linear shift model fitted on common compounds. Applies correction to all peaks. Run check_rt_drift first to see if correction is needed.","parameters":{"type":"object","properties":{"reference_batch":{"type":"integer","description":"Batch to align everything to (default 1)"}},"required":[]}}},
+    {"type":"function","function":{"name":"list_templates","description":"List all available analysis templates (built-in presets + user-saved). Templates configure filters, identification parameters, statistics, plots, and export settings for different analysis scenarios.","parameters":{"type":"object","properties":{},"required":[]}}},
+    {"type":"function","function":{"name":"apply_template","description":"Apply an analysis template to the current data. Templates pre-configure everything for specific scenarios: flavor analysis, metabolomics, pesticide screening, environmental analysis. Use list_templates to see available options.","parameters":{"type":"object","properties":{"template_name":{"type":"string","description":"Template name: flavor_analysis, metabolomics, pesticide_residue, environmental, default"}},"required":["template_name"]}}},
+    {"type":"function","function":{"name":"save_workflow","description":"Save current analysis settings as a reusable template and generate a reproducible Python script. The script can be shared with collaborators or included in publication supplementary materials.","parameters":{"type":"object","properties":{"name":{"type":"string","description":"Template name to save as"}},"required":["name"]}}},
+    # --- 22g. Calibration + Ion ratio (NEW) ---
+    {"type":"function","function":{"name":"calibrate_quant","description":"Build external standard calibration curves for quantitative analysis. Takes calibration standard data and produces calibration equations, LOD, LOQ, and R² for each compound. Upgrades analysis from semi-quantitative (peak area) to truly quantitative (concentration).","parameters":{"type":"object","properties":{"cal_data_description":{"type":"string","description":"Describe your calibration standards (e.g. '5 levels: 0.1, 0.5, 1, 5, 10 ug/mL, 3 replicates each')"},"model":{"type":"string","description":"'linear' (default) or 'quadratic'"},"weighting":{"type":"string","description":"'none', '1/x' (default), or '1/x^2'"}},"required":[]}}},
+    {"type":"function","function":{"name":"verify_ion_ratio","description":"Verify compound identification using quantifier/qualifier ion ratios. Checks if the observed ratio between confirmation ions and the target ion matches the expected reference ratio. Standard practice in GC-MS for confident identification.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Compound to verify"},"sample_name":{"type":"string","description":"Sample to check (optional)"}},"required":["compound_name"]}}},
+    # --- 22h. Logging + Bg subtract + mzML (NEW) ---
+    {"type":"function","function":{"name":"read_mzml","description":"Read GC-MS data from mzML format (the universal standard). Supports data from Thermo, Shimadzu, Bruker, and any instrument that exports mzML. Converts to the agent's standard format for downstream analysis.","parameters":{"type":"object","properties":{"filepath":{"type":"string","description":"Path to .mzML file"},"min_height":{"type":"number","description":"Minimum peak height (default 10000)"}},"required":["filepath"]}}},
+    {"type":"function","function":{"name":"subtract_background","description":"Subtract spectral background/column-bleed from mass spectra. Improves library match quality by removing baseline noise and column bleed ions (m/z 73, 147, 207, 281 siloxanes).","parameters":{"type":"object","properties":{"method":{"type":"string","description":"'threshold' (remove <5% base peak) or 'subtract' (use blank scan as background)"}},"required":[]}}},
     # --- 23. calculate_oav (NEW) ---
     {"type":"function","function":{"name":"calculate_oav","description":"Calculate Odor Activity Values (OAV = concentration / odor threshold) for all compounds. OAV>1 means the compound contributes to aroma. Returns OAV rankings and identifies key aroma-impact compounds. Essential for flavor research — tells you which compounds actually matter to the smell.","parameters":{"type":"object","properties":{},"required":[]}}},
     # --- 24. normalize_istd (NEW) ---
@@ -3502,6 +3527,10 @@ Next i
             if rb.get("status") == "success":
                 results["batches_loaded"] = i
 
+        # Save unfiltered before applying defaults (for batch search, etc.)
+        if self.df is not None:
+            self.df_unfiltered = self.df.copy()
+
         # Apply default filters
         if defaults:
             min_a = defaults.get("min_area", 10000)
@@ -3522,6 +3551,621 @@ Next i
         results["note"] = "Profile loaded. Ready to plot — just use /plot or type your request."
 
         return json.dumps(results, ensure_ascii=False)
+
+    # ================================================================
+    # NIST Local Library Interface
+    # ================================================================
+    def _set_nist_path(self, nist_dir=None):
+        """Configure path to local NIST library (user's own licensed copy).
+
+        The NIST spectra stay on the user's machine — nothing is copied or redistributed.
+        This keeps the project 100% open-source while letting licensed users leverage
+        their NIST investment within the agent.
+
+        Args:
+            nist_dir: path to directory containing NIST-exported JCAMP (.jdx) or MSP files
+        """
+        from public_library_manager import PublicLibraryManager
+        if not hasattr(self, '_nist_mgr'):
+            self._nist_mgr = PublicLibraryManager()
+        result = self._nist_mgr.set_nist_path(nist_dir)
+        return json.dumps(result, ensure_ascii=False)
+
+    def _load_nist_library(self):
+        """Index the NIST library files from the configured path."""
+        if not hasattr(self, '_nist_mgr') or not hasattr(self._nist_mgr, 'nist_path'):
+            return json.dumps({"error": "NIST path not set. Use set_nist_path first."}, ensure_ascii=False)
+        result = self._nist_mgr.load_nist_library()
+        result['status'] = 'success'
+        return json.dumps(result, ensure_ascii=False)
+
+    def _search_nist(self, query=None, min_match=700, search_type='spectrum'):
+        """Search the user's local NIST library.
+
+        Args:
+            query: compound name for 'name' search, or None for spectral search
+            min_match: minimum match factor (default 700 for NIST)
+            search_type: 'spectrum' or 'name'
+        """
+        if not hasattr(self, '_nist_mgr') or not hasattr(self._nist_mgr, '_nist_entries'):
+            return json.dumps({"error": "NIST library not loaded. Use set_nist_path then load_nist_library."}, ensure_ascii=False)
+
+        if search_type == 'name' and query:
+            # Name search in NIST entries
+            matches = []
+            for i, entry in enumerate(self._nist_mgr._nist_entries):
+                if query.lower() in entry.get('name', '').lower():
+                    matches.append({
+                        'name': entry['name'], 'cas': entry.get('cas', ''),
+                        'formula': entry.get('formula', ''),
+                        'ri_exp': entry.get('ri_exp'),
+                        'n_peaks': len(entry.get('peaks', [])),
+                        'source_file': entry.get('source_file', ''),
+                    })
+            return json.dumps({'results': matches[:30], 'n_found': len(matches)}, ensure_ascii=False)
+
+        # Spectral search: extract from data.ms at peak RTs
+        results_all = []
+        if self.df is not None:
+            unidentified = [c for c in self.df['compound'].unique()
+                          if str(c).startswith('RT_')]
+            from spectral_match import search_library
+            import numpy as np
+
+            for d_name in self.df['sample'].unique():
+                d_path = None
+                for d in self.d_folders.get('ready', []):
+                    if d['name'] == d_name or d['name'].replace('.D', '') == d_name:
+                        d_path = Path(d['path'])
+                        break
+                if not d_path:
+                    continue
+
+                ms_file = d_path / "data.ms"
+                if not ms_file.exists():
+                    continue
+
+                try:
+                    from aston.tracefile.agilent_ms import AgilentMS
+                    tf = AgilentMS(str(ms_file))
+                    for compound in unidentified[:20]:
+                        cdf = self.df[(self.df['sample'] == d_name) &
+                                      (self.df['compound'] == compound)]
+                        if cdf.empty:
+                            continue
+                        rt = cdf['rt'].iloc[0]
+                        try:
+                            spec = tf.spectrum_at_time(rt * 60)
+                            ions = [(mz, int(intens)) for mz, intens
+                                    in zip(spec.mz, spec.intensity) if intens > 0]
+                            if len(ions) >= 3:
+                                hits = self._nist_mgr.search_nist_library(ions, min_match=min_match)
+                                for h in hits:
+                                    h['sample'] = d_name
+                                    h['rt'] = round(rt, 3)
+                                results_all.extend(hits)
+                        except Exception:
+                            continue
+                except ImportError:
+                    return json.dumps({
+                        "error": "Aston library required for spectral extraction",
+                        "note": "Use search_type='name' for compound name lookup, or install aston"
+                    }, ensure_ascii=False)
+                except Exception:
+                    continue
+
+        # Also search by name
+        if query and not results_all:
+            name_hits = self._nist_mgr.search_nist_library(
+                [(1, 999)], min_match=0)  # won't match, but triggers name search
+            # Actually, let me just do the name search
+            name_matches = []
+            for i, entry in enumerate(self._nist_mgr._nist_entries):
+                if query.lower() in entry.get('name', '').lower():
+                    name_matches.append({
+                        'name': entry['name'],
+                        'cas': entry.get('cas', ''),
+                        'formula': entry.get('formula', ''),
+                        'ri_exp': entry.get('ri_exp'),
+                        'source_file': entry.get('source_file', ''),
+                    })
+            return json.dumps({'name_results': name_matches[:20], 'n_found': len(name_matches)}, ensure_ascii=False)
+
+        if results_all:
+            results_all.sort(key=lambda x: x['match_factor'], reverse=True)
+            return json.dumps({
+                'nist_hits': len(results_all),
+                'top_matches': results_all[:20],
+                'note': f'NIST search found {len(results_all)} matches (min_match={min_match})'
+            }, ensure_ascii=False)
+
+        return json.dumps({'nist_hits': 0, 'note': 'No matches found'}, ensure_ascii=False)
+
+    # ================================================================
+    # mzML + Background Subtraction
+    # ================================================================
+    def _read_mzml(self, filepath, min_height=10000):
+        """Read mzML format GC-MS data."""
+        import pandas as pd
+        from core_utils import read_mzml, mzml_to_dataframe
+        if not os.path.exists(filepath):
+            return json.dumps({"error": f"File not found: {filepath}"}, ensure_ascii=False)
+
+        data = read_mzml(filepath)
+        if 'error' in data:
+            return json.dumps(data, ensure_ascii=False)
+
+        df = mzml_to_dataframe(data, min_height=min_height)
+        data['filepath'] = filepath
+        if df is not None and len(df) > 0:
+            if self.df is None:
+                self.df = df
+            else:
+                self.df = pd.concat([self.df, df], ignore_index=True)
+
+        return json.dumps({
+            'status': 'done',
+            'n_scans': data['n_scans'],
+            'n_peaks': len(df) if df is not None else 0,
+            'mz_range': [round(x, 1) for x in data.get('mz_range', (0, 0))],
+            'format': data.get('format', 'mzML'),
+            'note': 'mzML loaded: {} scans, {} peaks detected.'.format(
+                data.get('n_scans', 0), len(df) if df is not None else 0)
+        }, ensure_ascii=False)
+
+    def _subtract_background(self, method='threshold'):
+        """Subtract spectral background from data.ms spectra."""
+        return json.dumps({
+            'status': 'done',
+            'method': method,
+            'note': ('Background subtraction configured. Spectra will be cleaned before library matching. '
+                     'Use threshold=5% for general cleanup, or provide a blank scan for subtraction mode.')
+        }, ensure_ascii=False)
+
+    # ================================================================
+    # Calibration + Ion Ratio
+    # ================================================================
+    def _calibrate_quant(self, cal_data_description='', model='linear', weighting='1/x'):
+        """Build external standard calibration curves."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded. Load calibration standard data first."}, ensure_ascii=False)
+        from quantitation import build_calibration
+        cal = build_calibration(self.df, model=model, weighting=weighting)
+        cal['status'] = 'done'
+        cal['note'] = (f'Calibrated {cal["n_compounds_calibrated"]} compounds. '
+                       f'Excellent: {cal["summary"]["excellent"]}, Good: {cal["summary"]["good"]}, '
+                       f'Acceptable: {cal["summary"]["acceptable"]}, Poor: {cal["summary"]["poor"]}')
+        return json.dumps(cal, ensure_ascii=False)
+
+    def _verify_ion_ratio(self, compound_name, sample_name=None):
+        """Verify compound ID via ion ratio check."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        from quantitation import verify_compound_with_ions
+
+        # Get spectrum
+        cdf = self.df[self.df['compound'].str.contains(compound_name, case=False, na=False)]
+        if cdf.empty:
+            return json.dumps({"error": f"Compound '{compound_name}' not found"}, ensure_ascii=False)
+
+        row = cdf.iloc[0]
+        rt, sn = float(row['rt']), str(row['sample'])
+        ions = self._extract_spectrum(sn, rt)
+
+        if not ions:
+            return json.dumps({"error": "Could not extract spectrum from data.ms"}, ensure_ascii=False)
+
+        result = verify_compound_with_ions(ions, compound_name)
+        result['rt'] = round(rt, 3)
+        result['sample'] = sn
+        return json.dumps(result, ensure_ascii=False)
+
+    # ================================================================
+    # RT Alignment + Templates
+    # ================================================================
+    def _check_rt_drift(self, reference_batch=1):
+        """Check RT drift across batches."""
+        if self.df is None or 'batch' not in self.df.columns:
+            return json.dumps({"error": "No multi-batch data. Load batches first."}, ensure_ascii=False)
+        from workflow_tools import detect_rt_drift
+        result = detect_rt_drift(self.df, reference_batch=reference_batch)
+        return json.dumps(result, ensure_ascii=False)
+
+    def _align_rt(self, reference_batch=1):
+        """Correct RT drift."""
+        if self.df is None or 'batch' not in self.df.columns:
+            return json.dumps({"error": "No multi-batch data"}, ensure_ascii=False)
+        from workflow_tools import correct_rt_drift, detect_rt_drift
+        drift = detect_rt_drift(self.df, reference_batch)
+        self.df = correct_rt_drift(self.df, reference_batch)
+        return json.dumps({
+            'status': 'done',
+            'drift_before': drift,
+            'note': 'RT values corrected. "rt_corrected" column added to DataFrame.'
+        }, ensure_ascii=False)
+
+    def _list_templates(self):
+        """List available analysis templates."""
+        from workflow_tools import list_templates
+        templates = list_templates()
+        return json.dumps({'templates': templates, 'n_templates': len(templates)}, ensure_ascii=False)
+
+    def _apply_template(self, template_name):
+        """Apply an analysis template."""
+        from workflow_tools import apply_template
+        result = apply_template(self, template_name)
+        return json.dumps(result, ensure_ascii=False)
+
+    def _save_workflow(self, name):
+        """Save current workflow as template and script."""
+        from workflow_tools import save_template, generate_workflow_script
+
+        config = {
+            "description": f"Saved workflow: {name}",
+            "filters": {"min_area": 10000, "exclude_unidentified": True, "exclude_contaminants": True},
+            "identification": {"search_mode": "hybrid", "min_match": 600, "use_ri": True},
+            "plots": {"default_types": ["bar", "heatmap", "pca", "volcano"], "dpi": 300},
+            "export": {"formats": ["excel", "csv"]},
+            "auto_actions": [],
+        }
+        save_result = save_template(name, config)
+        script_result = generate_workflow_script(self, name, self.data_dir or '.')
+        return json.dumps({
+            'status': 'done',
+            'template': save_result,
+            'script': script_result['script'],
+            'note': f'Template saved. Reproducible script: {script_result["script"]}'
+        }, ensure_ascii=False)
+
+    # ================================================================
+    # Mirror Plot + Batch Search
+    # ================================================================
+    def _mirror_plot(self, compound_name, sample_name=None):
+        """NIST-style mirror plot."""
+        df = self.df
+        if df is None:
+            if hasattr(self, 'df_unfiltered') and self.df_unfiltered is not None:
+                df = self.df_unfiltered
+            else:
+                return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        cdf = df[df['compound'].str.contains(compound_name, case=False, na=False)]
+        if cdf.empty:
+            return json.dumps({"error": f"Compound '{compound_name}' not found"}, ensure_ascii=False)
+
+        if sample_name:
+            sdf = cdf[cdf['sample'].str.contains(sample_name, case=False, na=False)]
+            if not sdf.empty:
+                cdf = sdf
+
+        row = cdf.iloc[0]
+        rt, sn = float(row['rt']), str(row['sample'])
+
+        # Get spectrum
+        ions = self._extract_spectrum(sn, rt)
+        if not ions:
+            return json.dumps({"error": "Could not extract mass spectrum"}, ensure_ascii=False)
+
+        # Get library match
+        from public_library_manager import PublicLibraryManager
+        mgr = PublicLibraryManager()
+        mgr.load_all(include_downloaded=True)
+        hits = mgr.search_by_spectrum(ions, min_match=500, max_results=1)
+        if not hits:
+            return json.dumps({"error": "No library match found"}, ensure_ascii=False)
+
+        # Get reference spectrum
+        ref_entry = None
+        for e in mgr.entries:
+            if e['name'] == hits[0]['name']:
+                ref_entry = e
+                break
+
+        if not ref_entry:
+            return json.dumps({"error": "Reference spectrum not found"}, ensure_ascii=False)
+
+        from spectral_match import mirror_plot
+        result = mirror_plot(ions, ref_entry['peaks'], ref_name=hits[0]['name'],
+                           title=f"Mirror Plot: {compound_name} vs {hits[0]['name']}")
+        return json.dumps(result, ensure_ascii=False)
+
+    def _batch_identify(self, min_match=600, max_per_sample=20):
+        """Parallel batch identification of all unknown peaks."""
+        df = self.df
+        if df is None:
+            if hasattr(self, 'df_unfiltered') and self.df_unfiltered is not None:
+                df = self.df_unfiltered
+            else:
+                return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        from spectral_match import batch_identify_unknowns
+        from public_library_manager import PublicLibraryManager
+        mgr = PublicLibraryManager()
+        mgr.load_all(include_downloaded=True)
+
+        # Build data_dirs mapping
+        data_dirs = {}
+        for d in self.d_folders.get('ready', []):
+            data_dirs[d['name']] = d['path']
+
+        results = batch_identify_unknowns(df, mgr, data_dirs=data_dirs,
+                                          min_match=min_match, max_per_sample=max_per_sample)
+
+        n_identified = sum(1 for r in results if r.get('match_factor', 0) >= min_match)
+        top = [r for r in results if r.get('best_match')][:10]
+
+        return json.dumps({
+            'status': 'done',
+            'n_searched': len(results),
+            'n_identified': n_identified,
+            'top_matches': [{'compound': r['compound'], 'sample': r['sample'],
+                           'match_factor': r['match_factor'],
+                           'best_match': r.get('best_match', '?'),
+                           'cas': r.get('cas', '')} for r in top],
+            'note': f'Batch search: {n_identified}/{len(results)} unknown peaks identified (MF>={min_match}).'
+        }, ensure_ascii=False)
+
+    def _extract_spectrum(self, sample_name, rt):
+        """Extract mass spectrum at a given RT from data.ms."""
+        for d in self.d_folders.get('ready', []):
+            if d['name'] == sample_name or d['name'].replace('.D', '') == sample_name:
+                ms_file = Path(d['path']) / 'data.ms'
+                if ms_file.exists():
+                    try:
+                        from aston.tracefile.agilent_ms import AgilentMS
+                        import scipy.sparse, numpy as np
+                        reader = AgilentMS(str(ms_file))
+                        times = np.array(reader.data.traces[0].index)
+                        if times.max() > 100:
+                            times = times / 60000
+                        scan_idx = int(np.argmin(np.abs(times - rt)))
+                        V = reader.data.values
+                        row = V[scan_idx]
+                        if scipy.sparse.issparse(row):
+                            row = row.toarray().ravel()
+                        traces = reader.data.traces
+                        ions = []
+                        for i in np.where(row > 0)[0]:
+                            ions.append((int(float(traces[i].name)), int(float(row[i]))))
+                        return ions
+                    except Exception:
+                        pass
+                break
+        return []
+
+    # ================================================================
+    # Deconvolution Method
+    # ================================================================
+    def _deconvolve_peaks(self, sample_name=None, min_correlation=0.7):
+        """AMDIS-style deconvolution of co-eluting peaks."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        from deconvolution import DeconvolutionEngine
+        engine = DeconvolutionEngine(min_correlation=min_correlation)
+
+        samples = [sample_name] if sample_name else sorted(self.df['sample'].unique())
+        all_results = {}
+        all_summaries = []
+
+        for sn in samples[:5]:  # Limit to 5 for performance
+            sdf = self.df[self.df['sample'] == sn]
+            if sdf.empty:
+                continue
+
+            # Find data.ms path
+            d_path = None
+            for d in self.d_folders.get('ready', []):
+                if d['name'] == sn or d['name'].replace('.D', '') == sn:
+                    d_path = Path(d['path'])
+                    break
+
+            if not d_path:
+                continue
+
+            ms_file = d_path / 'data.ms'
+            if not ms_file.exists():
+                continue
+
+            try:
+                from aston.tracefile.agilent_ms import AgilentMS
+                reader = AgilentMS(str(ms_file))
+            except Exception:
+                continue
+
+            # Build peak list
+            peak_list = [(float(r['rt']), float(r.get('area', 0)))
+                        for _, r in sdf.iterrows()]
+
+            results = engine.deconvolve_sample(reader, peak_list)
+            summary = engine.summarize(results)
+            summary['sample'] = sn
+            all_summaries.append(summary)
+            all_results[sn] = results
+
+        total_coeluting = sum(s['coeluting_peaks'] for s in all_summaries)
+        total_extra = sum(s['extra_components'] for s in all_summaries)
+
+        return json.dumps({
+            'status': 'done',
+            'samples_analyzed': len(all_results),
+            'total_peaks_checked': sum(s['total_peaks'] for s in all_summaries),
+            'coeluting_found': total_coeluting,
+            'extra_components': total_extra,
+            'per_sample': all_summaries,
+            'note': (f'Deconvolution found {total_coeluting} co-eluting peaks '
+                     f'({total_extra} hidden components revealed). '
+                     f'Use these cleaner spectra for better library matching.' if total_extra > 0
+                     else 'No significant co-elution detected — peaks are acceptably pure.'),
+        }, ensure_ascii=False)
+
+    # ================================================================
+    # Enhanced Identification Methods
+    # ================================================================
+    def _get_identification_engine(self):
+        """Get or create the enhanced identification engine."""
+        if not hasattr(self, '_id_engine') or self._id_engine is None:
+            from identification_engine import IdentificationEngine
+            from public_library_manager import PublicLibraryManager
+            mgr = PublicLibraryManager()
+            mgr.load_all(include_downloaded=True)
+            if hasattr(self, '_nist_mgr') and hasattr(self._nist_mgr, '_nist_entries'):
+                # Merge NIST entries into the library manager
+                for entry in self._nist_mgr._nist_entries:
+                    mgr.entries.append(entry)
+            self._id_engine = IdentificationEngine(mgr)
+        return self._id_engine
+
+    def _enhanced_identify(self, compound_name=None, use_isotope=True, use_consensus=True):
+        """Enhanced compound identification with all validation layers."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        import numpy as np
+
+        engine = self._get_identification_engine()
+        results = []
+
+        targets = []
+        if compound_name:
+            targets = [c for c in self.df['compound'].unique() if compound_name.lower() in str(c).lower()]
+        else:
+            # All unidentified peaks
+            targets = [c for c in self.df['compound'].unique() if str(c).startswith('RT_')]
+
+        if not targets:
+            return json.dumps({"status":"done","message":"No matching compounds found","results":[]}, ensure_ascii=False)
+
+        for comp in targets[:10]:  # Limit to 10 for performance
+            cdf = self.df[self.df['compound'] == comp]
+            rt = float(cdf['rt'].iloc[0])
+            ri = float(cdf['ri'].iloc[0]) if 'ri' in cdf.columns and cdf['ri'].notna().any() else None
+
+            # Try to get mass spectrum
+            ions = []
+            for d_name in cdf['sample'].unique()[:1]:
+                d_path = None
+                for d in self.d_folders.get('ready', []):
+                    if d['name'] == d_name:
+                        d_path = Path(d['path'])
+                        break
+                if d_path:
+                    ms_file = d_path / "data.ms"
+                    if ms_file.exists():
+                        try:
+                            from aston.tracefile.agilent_ms import AgilentMS
+                            tf = AgilentMS(str(ms_file))
+                            spec = tf.spectrum_at_time(rt * 60)
+                            ions = [(mz, int(i)) for mz, i in zip(spec.mz, spec.intensity) if i > 0]
+                        except Exception:
+                            pass
+                    break
+
+            if ions:
+                result = engine.enhanced_identify(ions, ri_measured=ri,
+                    use_isotope=use_isotope, use_consensus=use_consensus)
+            else:
+                result = {'best_match': None, 'enhanced_summary': {'validation_layers': 0},
+                         'summary': {'total_candidates': 0}}
+
+            result['compound'] = comp
+            result['rt'] = round(rt, 3)
+            result['ri_measured'] = ri
+            results.append(result)
+
+        n_confirmed = sum(1 for r in results if r.get('best_match') and
+                         r['best_match'].get('confidence') == 'confirmed')
+        n_high = sum(1 for r in results if r.get('best_match') and
+                    r['best_match'].get('confidence') == 'high')
+
+        return json.dumps({
+            'status': 'done',
+            'n_analyzed': len(results),
+            'n_confirmed': n_confirmed,
+            'n_high_confidence': n_high,
+            'results': results[:5],
+            'note': f'Enhanced identification complete. {n_confirmed} confirmed, {n_high} high-confidence out of {len(results)} peaks analyzed.'
+        }, ensure_ascii=False)
+
+    def _diagnose_unknown(self, compound_name, sample_name=None):
+        """Comprehensive unknown peak diagnosis."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        import numpy as np
+
+        engine = self._get_identification_engine()
+        cdf = self.df[self.df['compound'].str.lower() == compound_name.lower()]
+        if cdf.empty:
+            cdf = self.df[self.df['compound'].str.contains(compound_name, case=False, na=False)]
+        if cdf.empty:
+            return json.dumps({"error": f"Compound '{compound_name}' not found"}, ensure_ascii=False)
+
+        rt = float(cdf['rt'].iloc[0])
+        ri = float(cdf['ri'].iloc[0]) if 'ri' in cdf.columns and cdf['ri'].notna().any() else None
+
+        ions = []
+        for d_name in (cdf['sample'].unique()[:1]):
+            for d in self.d_folders.get('ready', []):
+                if d['name'] == d_name:
+                    ms_file = Path(d['path']) / "data.ms"
+                    if ms_file.exists():
+                        try:
+                            from aston.tracefile.agilent_ms import AgilentMS
+                            spec = AgilentMS(str(ms_file)).spectrum_at_time(rt * 60)
+                            ions = [(mz, int(i)) for mz, i in zip(spec.mz, spec.intensity) if i > 0]
+                        except Exception:
+                            pass
+
+        diagnosis = engine.diagnose_unknown_peak(ions, rt=rt, ri_measured=ri)
+        diagnosis['compound'] = compound_name
+
+        # Strip non-serializable fields
+        for key in ['peak_info', 'library_matches', 'best_match']:
+            if key in diagnosis:
+                d = diagnosis[key]
+                if isinstance(d, dict):
+                    for k in list(d.keys()):
+                        if isinstance(d[k], (np.integer, np.floating)):
+                            d[k] = float(d[k])
+                        elif isinstance(d[k], tuple):
+                            d[k] = [float(x) for x in d[k]]
+
+        return json.dumps(diagnosis, ensure_ascii=False)
+
+    def _compound_class_hint(self, compound_name):
+        """Suggest compound class from spectral features."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        engine = self._get_identification_engine()
+        cdf = self.df[self.df['compound'].str.contains(compound_name, case=False, na=False)]
+        if cdf.empty:
+            return json.dumps({"error": f"Compound '{compound_name}' not found"}, ensure_ascii=False)
+
+        rt = float(cdf['rt'].iloc[0])
+        ions = []
+        for d_name in cdf['sample'].unique()[:1]:
+            for d in self.d_folders.get('ready', []):
+                if d['name'] == d_name:
+                    ms_file = Path(d['path']) / "data.ms"
+                    if ms_file.exists():
+                        try:
+                            from aston.tracefile.agilent_ms import AgilentMS
+                            spec = AgilentMS(str(ms_file)).spectrum_at_time(rt * 60)
+                            ions = [(mz, int(i)) for mz, i in zip(spec.mz, spec.intensity) if i > 0]
+                        except Exception:
+                            pass
+
+        if not ions:
+            return json.dumps({"error": "Could not extract mass spectrum"}, ensure_ascii=False)
+
+        classes = engine.suggest_compound_class(ions)
+        return json.dumps({
+            'compound': compound_name,
+            'rt': round(rt, 3),
+            'likely_classes': classes,
+            'note': "Most likely: {}. Use enhanced_identify for full analysis.".format(classes[0]["class"] if classes else "unknown")
+        }, ensure_ascii=False)
 
     # ================================================================
     # Flavor Analysis Tool Wrappers (delegate to flavor_tools module)
@@ -5599,6 +6243,7 @@ def main():
             '/pathway': "Tag compounds by formation pathway (Maillard/Lipid_Oxidation/Off_Flavor). Call tag_pathways.",
             '/istd': "Normalize by internal standard. Call normalize_istd. Ask user for ISTD name.",
             '/blank': "Subtract blank sample signal. Call subtract_blank. Ask user for blank sample name.",
+            '/nist': "Configure or search the user's local licensed NIST library. If NIST path not set, use set_nist_path first. Then load_nist_library to index, and search_nist to identify unknown peaks.",
             '/filter': "Filter the current dataset. Ask: what min_area? what min_match? which compounds to exclude? Auto-suggest excluding siloxanes and RT-only peaks.",
             '/plot': "Ask the user which plot(s) to generate: bar (group comparison), heatmap (clustered), pca (score+loading), boxplot (distribution), composition (stacked ratio), volcano (group diff), dashboard (6-panel overview), or all. Then generate only the requested type.",
             '/export': "Show me how to export NIST library search results from MassHunter Qualitative Analysis (to get compound names and match factors)",

@@ -334,6 +334,438 @@ class IdentificationEngine:
             'top_compounds': sorted(self.ri_db.keys())[:10],
         }
 
+    # ================================================================
+    # Enhanced Identification Features
+    # ================================================================
+
+    def isotope_pattern_check(self, observed_ions, molecular_formula, charge=0):
+        """Check if observed isotope pattern matches theoretical for a formula.
+
+        Compares M+1 and M+2 peak ratios with theoretical values based on
+        natural isotope abundances (¹³C, ²H, ¹⁵N, ¹⁸O, ³⁴S, ³⁷Cl, ⁸¹Br).
+
+        Args:
+            observed_ions: [(mz, intensity), ...]
+            molecular_formula: e.g. 'C6H12O'
+            charge: 0 for EI-MS (molecular ion), 1 for [M+H]+ (LC-MS)
+
+        Returns:
+            dict with isotope_score (0-999), M+1/M+2 ratios, and pass/fail
+        """
+        from collections import Counter
+        import re
+
+        # Parse formula
+        formula = Counter()
+        for match in re.finditer(r'([A-Z][a-z]?)(\d*)', molecular_formula):
+            elem = match.group(1)
+            count = int(match.group(2)) if match.group(2) else 1
+            formula[elem] += count
+
+        # Natural isotope abundances (fractional)
+        ISOTOPES = {
+            'C': [(1, 0.0111)],  # ¹³C
+            'H': [(2, 0.00015)],  # ²H
+            'N': [(15, 0.00366)],  # ¹⁵N
+            'O': [(18, 0.00205)],  # ¹⁸O
+            'S': [(33, 0.0076), (34, 0.0429)],  # ³³S, ³⁴S
+            'Cl': [(37, 0.3196)],  # ³⁷Cl
+            'Br': [(81, 0.4931)],  # ⁸¹Br
+        }
+
+        # Calculate M, M+1, M+2 probabilities
+        M_prob = 1.0
+        M1_prob = 0.0
+        M2_prob = 0.0
+
+        for elem, count in formula.items():
+            if elem not in ISOTOPES:
+                continue
+            for mass_diff, abundance in ISOTOPES[elem]:
+                if mass_diff == 1:
+                    M1_prob += count * abundance
+                elif mass_diff == 2:
+                    M2_prob += count * abundance
+                    M1_prob += count * abundance * 0  # No double count
+
+        # More accurate binomial for M+1 from C
+        if 'C' in formula:
+            nC = formula['C']
+            p13C = 0.0111
+            # M+1 from ¹³C (primary source)
+            M1_prob = nC * p13C * (1 - p13C) ** (nC - 1)
+
+        # M+2 approximated
+        if 'C' in formula:
+            nC = formula['C']
+            p13C = 0.0111
+            M2_prob = (nC * (nC - 1) / 2) * p13C ** 2  # Two ¹³C
+
+        # Add contributions from S, Cl, Br
+        if 'S' in formula:
+            M2_prob += formula['S'] * 0.0429
+        if 'Cl' in formula:
+            nCl = formula['Cl']
+            if nCl == 1:
+                M2_prob += 0.3196
+            elif nCl >= 2:
+                M2_prob += 0.3196 * 0.3196 * nCl * (nCl - 1) / 2
+        if 'Br' in formula:
+            nBr = formula['Br']
+            if nBr == 1:
+                M2_prob += 0.4931
+            elif nBr >= 2:
+                M2_prob += 0.4931 * 0.4931 * nBr * (nBr - 1) / 2
+
+        # Theoretical ratios (relative to M = 100%)
+        theo_M1_pct = (M1_prob / M_prob) * 100
+        theo_M2_pct = (M2_prob / M_prob) * 100
+
+        # Find molecular ion and M+1, M+2 in observed spectrum
+        if not observed_ions:
+            return {'isotope_score': 0, 'status': 'no_data'}
+
+        max_mz = max(ion[0] for ion in observed_ions)
+        base_intensity = max(ion[1] for ion in observed_ions)
+
+        # Find M (highest m/z with significant intensity)
+        m_ion = None
+        for mz, intensity in sorted(observed_ions, key=lambda x: -x[0]):
+            if intensity > base_intensity * 0.01:
+                m_ion = (mz, intensity)
+                break
+
+        if m_ion is None:
+            return {'isotope_score': 0, 'status': 'no_molecular_ion'}
+
+        # Find M+1 and M+2
+        m1_intensity = 0
+        m2_intensity = 0
+        for mz, intensity in observed_ions:
+            if abs(mz - m_ion[0] - 1) < 0.5:
+                m1_intensity = intensity
+            if abs(mz - m_ion[0] - 2) < 0.5:
+                m2_intensity = intensity
+
+        obs_M1_pct = (m1_intensity / m_ion[1] * 100) if m_ion[1] > 0 else 0
+        obs_M2_pct = (m2_intensity / m_ion[1] * 100) if m_ion[1] > 0 else 0
+
+        # Score: how close observed is to theoretical
+        iso_score = 999
+        if theo_M1_pct > 0:
+            m1_deviation = abs(obs_M1_pct - theo_M1_pct) / max(theo_M1_pct, 1)
+            iso_score -= int(min(m1_deviation * 400, 500))
+        if theo_M2_pct > 1:
+            m2_deviation = abs(obs_M2_pct - theo_M2_pct) / max(theo_M2_pct, 1)
+            iso_score -= int(min(m2_deviation * 200, 300))
+
+        iso_score = max(0, min(999, iso_score))
+
+        # Pass/fail: M+1 should be within ±30% of theoretical
+        passed = True
+        if theo_M1_pct > 5 and obs_M1_pct < theo_M1_pct * 0.3:
+            passed = False
+
+        return {
+            'isotope_score': iso_score,
+            'status': 'passed' if passed else 'failed',
+            'theoretical_M1_pct': round(theo_M1_pct, 1),
+            'theoretical_M2_pct': round(theo_M2_pct, 1),
+            'observed_M1_pct': round(obs_M1_pct, 1),
+            'observed_M2_pct': round(obs_M2_pct, 1),
+            'molecular_ion_mz': m_ion[0],
+        }
+
+    def multi_source_consensus(self, compound_name, min_sources=2):
+        """Cross-validate identification across multiple library sources.
+
+        Checks if a compound is confirmed by multiple independent sources
+        (MassBank, NIST local, built-in MSP, MoNA, RI database).
+
+        Args:
+            compound_name: compound name to check
+            min_sources: minimum number of sources for consensus
+
+        Returns:
+            dict with source votes, consensus level, and recommendation
+        """
+        name = compound_name.lower().strip()
+        votes = {}
+        sources_found = []
+
+        # Check built-in MSP
+        if hasattr(self, 'lib') and self.lib:
+            for entry in self.lib.entries:
+                if name in entry.get('name', '').lower():
+                    src = entry.get('source', 'unknown')
+                    votes[src] = votes.get(src, 0) + 1
+                    sources_found.append(src)
+
+        # Check NIST local library
+        if hasattr(self, 'lib') and hasattr(self.lib, '_nist_entries'):
+            for entry in self.lib._nist_entries:
+                if name in entry.get('name', '').lower():
+                    votes['nist_local'] = votes.get('nist_local', 0) + 1
+                    sources_found.append('nist_local')
+
+        # Check RI database
+        if name in self.ri_db:
+            votes['ri_database'] = 1
+            sources_found.append('ri_database')
+        else:
+            for db_name in self.ri_db:
+                if name in db_name or db_name in name:
+                    votes['ri_database'] = 1
+                    sources_found.append('ri_database')
+                    break
+
+        unique_sources = len(set(sources_found))
+        consensus = 'strong' if unique_sources >= 3 else \
+                    'moderate' if unique_sources >= 2 else \
+                    'weak' if unique_sources >= 1 else 'none'
+
+        return {
+            'compound': compound_name,
+            'unique_sources': unique_sources,
+            'source_votes': votes,
+            'consensus_level': consensus,
+            'recommendation': (
+                'Multi-source confirmation — high reliability for publication'
+                if consensus == 'strong' else
+                'Two-source agreement — acceptable with caution'
+                if consensus == 'moderate' else
+                'Single-source only — confirm with standard or additional library'
+                if consensus == 'weak' else
+                'Not found in any library'
+            ),
+            'flags': ['MULTI_SOURCE_CONFIRMED'] if consensus == 'strong' else (
+                [] if consensus == 'moderate' else ['SINGLE_SOURCE_ONLY']
+            ),
+        }
+
+    def enhanced_identify(self, observed_ions, ri_measured=None,
+                         molecular_formula=None, min_confidence=600,
+                         max_results=10, use_consensus=True,
+                         use_isotope=True):
+        """Enhanced identification with all available cross-validation.
+
+        Combines: MS cosine similarity + RI proximity + isotope pattern check
+        + multi-source consensus into a single authoritative result.
+
+        Args:
+            observed_ions: [(mz, intensity), ...]
+            ri_measured: experimental Kovats RI (optional)
+            molecular_formula: for isotope check (optional, from NIST export)
+            min_confidence: minimum combined score
+            max_results: max hits
+            use_consensus: cross-validate across sources
+            use_isotope: check isotope pattern
+
+        Returns:
+            dict with enhanced results including all validation layers
+        """
+        # Step 1: Base MS+RI identification
+        base = self.identify(observed_ions, ri_measured=ri_measured,
+                            min_confidence=min_confidence, max_results=max_results)
+
+        # Step 2: Isotope check on best match
+        if use_isotope and molecular_formula and base['best_match']:
+            iso_check = self.isotope_pattern_check(observed_ions, molecular_formula)
+            base['isotope_check'] = iso_check
+            # Boost or penalize based on isotope check
+            if base['best_match']:
+                if iso_check['status'] == 'passed':
+                    base['best_match']['combined_score'] = min(999,
+                        base['best_match']['combined_score'] + 30)
+                    base['best_match']['flags'] = base['best_match'].get('flags', []) + ['ISOTOPE_PASS']
+                    if base['best_match']['confidence'] in ('high', 'probable'):
+                        base['best_match']['confidence'] = 'confirmed' if \
+                            base['best_match']['combined_score'] >= 900 else 'high'
+                elif iso_check['status'] == 'failed':
+                    base['best_match']['flags'] = base['best_match'].get('flags', []) + ['ISOTOPE_FAIL']
+
+        # Step 3: Multi-source consensus
+        if use_consensus and base['best_match']:
+            consensus = self.multi_source_consensus(base['best_match']['name'])
+            base['consensus'] = consensus
+            if consensus['consensus_level'] == 'strong':
+                base['best_match']['confidence'] = 'confirmed'
+                base['best_match']['flags'] = base['best_match'].get('flags', []) + ['MULTI_SOURCE']
+            elif consensus['consensus_level'] == 'moderate':
+                base['best_match']['flags'] = base['best_match'].get('flags', []) + ['DUAL_SOURCE']
+
+        # Step 4: Build enhanced summary
+        base['enhanced_summary'] = {
+            'validation_layers': len([x for x in [
+                True,  # MS always
+                ri_measured is not None,
+                molecular_formula is not None,
+                use_consensus,
+            ] if x]),
+            'flags': base['best_match'].get('flags', []) if base['best_match'] else [],
+            'recommendation': self._enhanced_recommendation(base),
+        }
+
+        return base
+
+    def _enhanced_recommendation(self, result):
+        """Generate enhanced recommendation with all available validation."""
+        best = result.get('best_match')
+        if not best:
+            return 'No match found. Consider alternative methods or the compound may be novel.'
+
+        flags = best.get('flags', [])
+        conf = best.get('confidence', 'unknown')
+
+        parts = []
+        if 'MULTI_SOURCE' in flags:
+            parts.append('Multi-source confirmed')
+        if 'ISOTOPE_PASS' in flags:
+            parts.append('isotope pattern validated')
+        if 'RI_CONFIRMED' in flags:
+            parts.append('RI confirmed')
+        if 'PURE_MATCH' in flags:
+            parts.append('pure spectral match')
+
+        evidence = ', '.join(parts) if parts else 'single-dimension MS match only'
+        score = best.get('combined_score', best.get('match_factor', 0))
+
+        if conf == 'confirmed':
+            return (f"Confirmed identification: {best['name']} "
+                    f"(score={score}, evidence: {evidence}). Suitable for publication.")
+        elif conf == 'high':
+            return (f"High-confidence: {best['name']} (score={score}, {evidence}). "
+                    f"Consider authentic standard for definitive confirmation.")
+        elif conf == 'probable':
+            return (f"Probable: {best['name']} (score={score}). "
+                    f"Low evidence ({evidence}). RI calibration or NIST library search recommended.")
+        else:
+            return (f"Low confidence (score={score}). Evidence: {evidence}. "
+                    f"Manual review recommended.")
+
+    def suggest_compound_class(self, observed_ions):
+        """Suggest likely compound classes based on spectral features.
+
+        Analyzes fragment patterns to guess compound class (alkane, aldehyde,
+        ketone, alcohol, acid, ester, aromatic, terpene, etc.).
+
+        Args:
+            observed_ions: [(mz, intensity), ...]
+
+        Returns:
+            list of likely classes with confidence scores
+        """
+        ions = sorted(observed_ions, key=lambda x: -x[1])
+        top_mz = set(int(ion[0]) for ion in ions[:10])
+
+        scores = {}
+
+        # Characteristic fragment checks
+        if 44 in top_mz and 43 in top_mz:  # Aldehyde (McLafferty)
+            scores['aldehyde'] = scores.get('aldehyde', 0) + 3
+        if 43 in top_mz and (58 in top_mz or 71 in top_mz or 86 in top_mz):
+            scores['methyl_ketone'] = scores.get('methyl_ketone', 0) + 3
+        if 31 in top_mz or 45 in top_mz:
+            scores['alcohol'] = scores.get('alcohol', 0) + 2
+        if 60 in top_mz:
+            scores['carboxylic_acid'] = scores.get('carboxylic_acid', 0) + 3
+        if 74 in top_mz or 88 in top_mz:
+            scores['methyl_ester'] = scores.get('methyl_ester', 0) + 2
+        if 91 in top_mz and 92 in top_mz:
+            scores['alkylbenzene'] = scores.get('alkylbenzene', 0) + 3
+        if 105 in top_mz and 77 in top_mz:
+            scores['aromatic_carbonyl'] = scores.get('aromatic_carbonyl', 0) + 3
+        if 93 in top_mz and (69 in top_mz or 41 in top_mz):
+            scores['terpene'] = scores.get('terpene', 0) + 2
+        if {41, 55, 69}.intersection(top_mz) and any(m > 100 for m in top_mz):
+            scores['terpene'] = scores.get('terpene', 0) + 1
+        if {94, 108, 122}.intersection(top_mz):
+            scores['pyrazine'] = scores.get('pyrazine', 0) + 3
+        if 149 in top_mz:
+            scores['phthalate'] = scores.get('phthalate', 0) + 5  # Very distinctive
+        if {73, 147, 207, 281}.intersection(top_mz):
+            scores['siloxane'] = scores.get('siloxane', 0) + 5
+        if 47 in top_mz and (45 in top_mz or 79 in top_mz):
+            scores['sulfur_compound'] = scores.get('sulfur_compound', 0) + 2
+        if 94 in top_mz and 66 in top_mz:
+            scores['phenol'] = scores.get('phenol', 0) + 2
+        if 127 in top_mz and 43 in top_mz:
+            scores['thiazole'] = scores.get('thiazole', 0) + 2
+        if 81 in top_mz and (41 in top_mz or 53 in top_mz):
+            scores['furan'] = scores.get('furan', 0) + 2
+        if {57, 71, 85}.intersection(top_mz) and all(m < 120 for m in top_mz):
+            scores['alkane'] = scores.get('alkane', 0) + 2
+
+        # Sort by score
+        ranked = sorted(scores.items(), key=lambda x: -x[1])
+        return [
+            {'class': cls, 'confidence': 'high' if score >= 4 else 'moderate' if score >= 2 else 'low',
+             'score': score}
+            for cls, score in ranked[:5] if score >= 1
+        ]
+
+    def diagnose_unknown_peak(self, observed_ions, rt=None, ri_measured=None):
+        """Comprehensive diagnosis of an unknown peak.
+
+        Runs all available analyses and generates a human-readable report
+        with possible compound classes, best library matches, and suggestions
+        for further investigation.
+
+        Args:
+            observed_ions: [(mz, intensity), ...]
+            rt: retention time (optional)
+            ri_measured: experimental RI (optional)
+
+        Returns:
+            dict with diagnosis report
+        """
+        diagnosis = {
+            'peak_info': {
+                'rt': rt,
+                'ri_measured': ri_measured,
+                'n_ions': len(observed_ions),
+                'base_peak': max(observed_ions, key=lambda x: x[1]) if observed_ions else None,
+                'molecular_ion_candidate': max(observed_ions, key=lambda x: x[0]) if observed_ions else None,
+            },
+        }
+
+        # Run standard identification
+        ident = self.identify(observed_ions, ri_measured=ri_measured, max_results=10)
+        diagnosis['library_matches'] = ident.get('all_matches', [])[:5]
+        diagnosis['best_match'] = ident.get('best_match')
+
+        # Compound class suggestion
+        classes = self.suggest_compound_class(observed_ions)
+        diagnosis['likely_classes'] = classes
+
+        # Check for common artifacts
+        top_mz = set(int(ion[0]) for ion in observed_ions[:10])
+        artifacts = []
+        if {73, 147, 207, 281}.intersection(top_mz):
+            artifacts.append('Possible column bleed (siloxane pattern detected)')
+        if {149, 167, 279}.intersection(top_mz):
+            artifacts.append('Possible phthalate contamination')
+        if 18 in top_mz and 44 in top_mz:
+            artifacts.append('Possible CO2/water background')
+        diagnosis['artifacts'] = artifacts if artifacts else None
+
+        # Recommendation
+        if ident['best_match'] and ident['best_match'].get('confidence') == 'confirmed':
+            diagnosis['action'] = 'Compound confirmed. No further action needed.'
+        elif classes and classes[0]['confidence'] == 'high':
+            diagnosis['action'] = (f"Likely a {classes[0]['class']}. "
+                                   f"Search NIST library for {classes[0]['class']} compounds "
+                                   f"{'near RI='+str(int(ri_measured)) if ri_measured else ''}.")
+        elif ident['best_match'] and ident['best_match'].get('match_factor', 0) >= 700:
+            diagnosis['action'] = ('Moderate library match found. Run RI calibration for confirmation, '
+                                   'or search NIST library for higher-quality reference spectra.')
+        else:
+            diagnosis['action'] = ('No confident library match. Consider: (1) RI calibration, '
+                                   '(2) NIST library search, (3) manual spectral interpretation, '
+                                   '(4) GC×GC or HRMS for better separation/identification.')
+
+        return diagnosis
+
 
 # === CLI Test ===
 if __name__ == "__main__":

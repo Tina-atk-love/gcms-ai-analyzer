@@ -1,91 +1,126 @@
-# GC-MS AI Analyzer Agent
+# GC-MS AI Analyzer
 
-**开源 NIST 替代方案** — 基于 DeepSeek API 的 Agilent ChemStation `.D` 数据全自动分析智能体。
+**Open-source NIST alternative** — Agilent ChemStation `.D` 数据全自动分析平台。
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Spectra](https://img.shields.io/badge/EI--MS_Spectra-12,709-orange)](#谱库)
-[![RI](https://img.shields.io/badge/RI_Database-1,498-teal)](#保留指数)
-
-## 核心能力
-
-| 功能 | 说明 |
-|------|------|
-| 数据提取 | 自动解析 REPORT01.CSV / Report.TXT / XLSX / TIC CSV |
-| 化合物鉴定 | 5 层策略：NIST 导出 → MSP 余弦匹配 → 在线 MassBank → 内置 RT 库 → RT 标签 |
-| EI-MS 谱库 | 12,709 张参考谱图，24 个化学类别，0.1-0.5s 检索 |
-| RI 数据库 | 1,498 个 Kovats 保留指数，支持自动校准 |
-| 统计分析 | Welch t-test + Mann-Whitney U + FDR + Cohen's d |
-| 可视化 | 8 种发表级图表（300dpi，中文字体）|
-| AI 解读 | DeepSeek 自动生成分析报告 |
-| 成本 | ~¥0.01/次分析 |
+[![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docker.com)
+[![Tools](https://img.shields.io/badge/Tools-48-orange)](#工具列表)
 
 ## 快速开始
 
 ```powershell
-# 1. 安装依赖
+# 1. 安装
 pip install -r requirements.txt
 
-# 2. 设置 DeepSeek API Key
+# 2. 设置 API Key
 $env:DEEPSEEK_API_KEY = "sk-xxx"
 
-# 3. 启动智能体
+# 3. 启动 Web 界面
+streamlit run app.py
+
+# 或 CLI 模式
 python gcms_agent.py -d "D:\your_data"
 ```
 
-## 快捷命令
+Docker 一键部署：
+```bash
+docker-compose up -d
+# 浏览器打开 http://localhost:8501
+```
 
-| 命令 | 功能 |
+## 核心能力
+
+| 类别 | 功能 |
 |------|------|
-| `/run` | 提取数据 + 自动鉴定 |
-| `/plot bar/pca/heatmap/volcano` | 选择性出图 |
-| `/identify` | 开源谱库鉴定 |
-| `/ri` | RI 自动校准（需烷烃标准品）|
-| `/filter` | 数据过滤 |
-| `/report` | 发表级报告 |
+| **数据加载** | Agilent .D 文件夹、tic_front.csv、data.ms、REPORT01.CSV、JCAMP-DX |
+| **峰处理** | 自动峰检测+积分、AMDIS 风格去卷积、RT 漂移校正 |
+| **化合物鉴定** | 7 层策略：NIST导出 → MSP余弦 → MassBank → MoNA → RI双维 → 同位素 → 多源共识 |
+| **统计分析** | t-test、ANOVA+Tukey、PLS-DA VIP、Random Forest、FDR |
+| **定量** | 外标校准曲线、内标归一化、LOD/LOQ、离子比验证、空白扣除 |
+| **风味专项** | OAV 计算、风味轮、异味数据库、Maillard/脂质氧化路径标记 |
+| **可视化** | 12 种图表：bar/heatmap/pca/volcano/boxplot/composition/dashboard/风味轮/PLSDA/RF/镜像图/相关性 |
+| **导出** | Excel、Word 三线表、Plotly 交互 HTML、可复现 Python 脚本 |
+| **部署** | CLI / Streamlit Web / Docker |
 
 ## 谱库
 
-| 来源 | 谱图数 | 类型 |
-|------|--------|------|
-| MassBank EU (NIST 格式) | 12,516 | EI-MS 名义质量数 |
-| 内置精选 | 193 | EI-MS 精选 |
-| NIST WebBook (公开) | 1,498 | Kovats RI |
-| MassBank.eu v3 API | 139,000+ | 在线按需检索 |
+| 来源 | 谱图数 | 类型 | 许可 |
+|------|--------|------|------|
+| MassBank EU | 28,191 | EI-MS | CC-BY |
+| 内置风味库 | 186 | EI-MS | 自建 |
+| JCAMP (用户提供) | 可变 | EI-MS + RI | 用户许可 |
+| NIST 本地接口 | 可变 | EI-MS + RI | 用户许可（不随项目分发） |
+| MoNA API | 1,000,000+ | MS/MS | 公开 API |
+| 气味阈值 DB | 136 种 | OAV | 文献汇编 |
 
-## 文件结构
+## 工具列表
+
+### 数据加载 (5)
+`scan_data_directory` `extract_all_data` `check_chemstation_files` `load_replicate_batch` `detect_peaks`
+
+### 样品管理 (3)
+`rename_samples` `set_groups` `filter_data`
+
+### 化合物鉴定 (10)
+`match_builtin_library` `search_public_libraries` `calibrate_ri` `identify_with_ri`
+`enhanced_identify` `diagnose_unknown` `compound_class_hint` `batch_identify`
+`deconvolve_peaks` `search_nist`
+
+### NIST 本地库 (3)
+`set_nist_path` `load_nist_library` `search_nist`
+
+### 统计分析 (4)
+`compare_groups` `run_statistical_analysis` `run_anova` `run_plsda` `run_random_forest`
+
+### 风味分析 (5)
+`calculate_oav` `flavor_wheel` `off_flavor_check` `tag_pathways` `verify_ion_ratio`
+
+### 定量 (3)
+`calibrate_quant` `normalize_istd` `subtract_blank`
+
+### 可视化 (5)
+`generate_plots` `volcano_plot` `correlation_heatmap` `mirror_plot` `html_report`
+
+### RT 校正 (2)
+`check_rt_drift` `align_rt`
+
+### 模板与工作流 (4)
+`list_templates` `apply_template` `save_workflow` `suggest_analysis`
+
+### 导出 (3)
+`export_report` `comprehensive_report` `word_tables`
+
+### 质量 (2)
+`quality_report` `find_anomalies` `correct_batch`
+
+## 项目结构
 
 ```
 gcms_analyzer/
-├── gcms_agent.py              # AI 智能体主程序
-├── gcms_analyzer.py           # 非交互式分析器
-├── public_library_manager.py  # 统一谱库管理器
-├── spectral_match.py          # 余弦相似度匹配引擎
-├── spectral_library.py        # 内置 MSP 谱库 (~193 张)
-├── mona_client.py             # MassBank 在线 API 客户端
-├── mass_spectra_reader.py     # data.ms 读取器
-├── download_public_libs.py    # 公共谱库下载工具
-├── public_libraries/
-│   ├── ei_ms_combined.msp     # 合并的 12,709 张 EI-MS 谱图
-│   └── nist_webbook_ri.json   # 1,498 条 RI 数据
-├── GEMINI.md                  # 智能体详细文档
-└── requirements.txt
+├── gcms_agent.py              # 主程序 (48 tools, LLM agent)
+├── app.py                     # Streamlit Web 界面
+├── flavor_tools.py            # 风味分析 (OAV/ANOVA/PLS-DA/RF/风味轮/异味)
+├── identification_engine.py   # 增强鉴定 (同位素/共识/类别推测/诊断)
+├── spectral_match.py          # 谱库搜索 (余弦匹配/镜像图/批量搜索)
+├── deconvolution.py           # 峰去卷积 (AMDIS 风格)
+├── quantitation.py            # 定量 (校准曲线/离子比验证)
+├── workflow_tools.py          # 模板系统 + RT 漂移校正
+├── public_library_manager.py  # 统一谱库管理 (MSP/JCAMP/JSON/CSV/NIST)
+├── spectral_library.py        # 内置 MSP 风味谱库
+├── public_libraries/          # 开源谱库文件
+├── Dockerfile / docker-compose.yml
+├── start.sh                   # 一键启动脚本
+└── CHANGELOG.md               # 开发日志
 ```
-
-## 与 NIST 对比
-
-| 指标 | NIST 2023 | 本智能体 |
-|------|-----------|---------|
-| 本地 EI-MS | 350,000 | 12,709 |
-| 在线检索 | 无 | 139,000 (MassBank) |
-| RI 数据库 | 350,000 | 1,498 + 自动校准 |
-| 统计分析 | 无 | ✅ |
-| AI 解读 | 无 | ✅ |
-| 成本 | ¥数万/年 | ¥0.01/次 |
-| 开源 | ❌ | ✅ MIT |
 
 ## 发表引用
 
-使用本智能体鉴定化合物时，请引用：
+使用开源谱库鉴定化合物时请引用：
 - MassBank: Horai et al. (2010) *J. Mass Spectrom.* 45(7), 703-714
+- MoNA: https://mona.fiehnlab.ucdavis.edu
 - NIST WebBook: Linstrom & Mallard (eds.), NIST SRD 69
+
+## License
+
+MIT — 开源免费。内置谱库为 CC-BY 许可。NIST 接口不随项目分发任何商业谱库数据。

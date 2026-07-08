@@ -52,3 +52,16 @@ data/
 
 # Streamlit
 .streamlit/
+
+# NIST config (local paths to licensed library)
+.nist_config.json
+
+# User workflow templates (built-in presets are in code)
+templates/
+
+# Log files
+logs/
+
+# Cad files / binary test data
+*.CH
+*.UV
