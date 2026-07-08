@@ -50,8 +50,9 @@ DEEPSEEK_MODEL = "deepseek-chat"
 # ============================================================
 
 PUBLICATION_RCPARAMS = {
-    'font.family': 'sans-serif',
-    'font.sans-serif': ['Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica'],
+    'font.family': 'serif',
+    'font.serif': ['Times New Roman', 'SimSun', 'STSong', 'SimHei'],
+    'mathtext.fontset': 'stix',
     'axes.unicode_minus': False,
     'figure.dpi': 150,
     'savefig.dpi': 300,
@@ -608,6 +609,30 @@ TOOLS = [
             }
         }
     },
+    # --- 23. calculate_oav (NEW) ---
+    {"type":"function","function":{"name":"calculate_oav","description":"Calculate Odor Activity Values (OAV = concentration / odor threshold) for all compounds. OAV>1 means the compound contributes to aroma. Returns OAV rankings and identifies key aroma-impact compounds. Essential for flavor research — tells you which compounds actually matter to the smell.","parameters":{"type":"object","properties":{},"required":[]}}},
+    # --- 24. normalize_istd (NEW) ---
+    {"type":"function","function":{"name":"normalize_istd","description":"Normalize compound concentrations by internal standard (ISTD). Corrects for injection volume variation and instrument drift. Use this when you have an internal standard in your samples for quantitative comparison.","parameters":{"type":"object","properties":{"istd_name":{"type":"string","description":"Name of internal standard compound (e.g. '2-octanol', '1,2-dichlorobenzene')"},"istd_conc":{"type":"number","description":"Known concentration of ISTD (default 1.0 for relative normalization)"}},"required":[]}}},
+    # --- 25. subtract_blank (NEW) ---
+    {"type":"function","function":{"name":"subtract_blank","description":"Subtract blank sample signal and flag compounds below signal/noise threshold. Identifies and removes background contamination, column bleed, and solvent peaks. Essential for clean publication data.","parameters":{"type":"object","properties":{"blank_sample_name":{"type":"string","description":"Name of blank sample (e.g. 'Blank', 'Solvent')"},"min_signal_ratio":{"type":"number","description":"Minimum signal/blank ratio (default 3.0)"}},"required":[]}}},
+    # --- 26. run_anova (NEW) ---
+    {"type":"function","function":{"name":"run_anova","description":"Run one-way ANOVA across all groups for each compound, with Tukey HSD post-hoc test. Identifies compounds with significant group differences across 3+ groups. More powerful than pairwise t-tests for multi-group experiments.","parameters":{"type":"object","properties":{"alpha":{"type":"number","description":"Significance level (default 0.05)"},"posthoc_method":{"type":"string","description":"'tukey' (equal variance) or 'games_howell' (unequal variance)"}},"required":[]}}},
+    # --- 27. flavor_wheel (NEW) ---
+    {"type":"function","function":{"name":"flavor_wheel","description":"Generate a flavor wheel / radar chart showing the aroma profile by odor category (green/grassy, fruity, roasted, sulfurous, etc.). One glance tells you the overall flavor character of your samples.","parameters":{"type":"object","properties":{"title":{"type":"string","description":"Chart title (e.g. 'Microalgae Protein Flavor Profile')"}},"required":[]}}},
+    # --- 28. off_flavor_check (NEW) ---
+    {"type":"function","function":{"name":"off_flavor_check","description":"Check all detected compounds against a microalgae-specific off-flavor database (geosmin, 2-MIB, dimethyl trisulfide, indole, etc.). Reports which off-flavor compounds are present, their odor descriptors, and severity levels.","parameters":{"type":"object","properties":{},"required":[]}}},
+    # --- 29. tag_pathways (NEW) ---
+    {"type":"function","function":{"name":"tag_pathways","description":"Auto-tag compounds by formation pathway: Maillard reaction, lipid oxidation, fermentation. Helps understand where flavors come from and how to control them.","parameters":{"type":"object","properties":{},"required":[]}}},
+    # --- 30. run_plsda (NEW) ---
+    {"type":"function","function":{"name":"run_plsda","description":"Run PLS-DA (Partial Least Squares Discriminant Analysis) to identify key compounds that discriminate between groups. Produces VIP scores ranking compounds by their importance in group separation. More targeted than PCA for finding flavor markers.","parameters":{"type":"object","properties":{"n_components":{"type":"integer","description":"Number of latent variables (default 2)"}},"required":[]}}},
+    # --- 31. run_random_forest (NEW) ---
+    {"type":"function","function":{"name":"run_random_forest","description":"Run Random Forest classification to discover flavor marker compounds. Non-parametric method that captures non-linear relationships and compound interactions. Reports cross-validated accuracy and feature importance ranking.","parameters":{"type":"object","properties":{"n_estimators":{"type":"integer","description":"Number of trees (default 100)"}},"required":[]}}},
+    # --- 32. html_report (NEW) ---
+    {"type":"function","function":{"name":"html_report","description":"Generate an interactive HTML report with Plotly charts (zoomable bar chart, heatmap, PCA). Perfect for group meetings, presentations, and sharing results online. Open in any browser.","parameters":{"type":"object","properties":{"title":{"type":"string","description":"Report title (default: 'GC-MS Flavor Analysis Report')"}},"required":[]}}},
+    # --- 33. word_tables (NEW) ---
+    {"type":"function","function":{"name":"word_tables","description":"Export results as formatted Word (.docx) tables in 三线表 style suitable for Chinese academic journals. Includes compound summary table, ANOVA significant compounds, and group comparison table. Ready for manuscript insertion.","parameters":{"type":"object","properties":{},"required":[]}}},
+    # --- 34. correct_batch (NEW) ---
+    {"type":"function","function":{"name":"correct_batch","description":"Correct for systematic batch effects between replicate experiments using location-scale adjustment. Normalizes each batch to the reference batch, removing unwanted technical variation while preserving biological differences.","parameters":{"type":"object","properties":{},"required":[]}}},
 ]
 
 # ============================================================
@@ -1588,6 +1613,7 @@ class GCMSAgent:
         import numpy as np
         import matplotlib.pyplot as plt
         import seaborn as sns
+        plt.rcParams.update(PUBLICATION_RCPARAMS)
 
         pivot = self.df.pivot_table(values='conc_g100g', index='sample', columns='compound', aggfunc='mean')
         data_norm = (pivot - pivot.mean()) / pivot.std()
@@ -1625,6 +1651,7 @@ class GCMSAgent:
         from matplotlib.patches import Ellipse
         from sklearn.decomposition import PCA
         from sklearn.preprocessing import StandardScaler
+        plt.rcParams.update(PUBLICATION_RCPARAMS)
 
         pivot = self.df.pivot_table(values='conc_g100g', index=['group', 'sample'],
                                      columns='compound', aggfunc='mean').fillna(0)
@@ -1696,6 +1723,7 @@ class GCMSAgent:
         import matplotlib.pyplot as plt
         import seaborn as sns
         from scipy import stats
+        plt.rcParams.update(PUBLICATION_RCPARAMS)
 
         avail = sorted(self.df['compound'].unique())
         groups = sorted(self.df['group'].unique())
@@ -1758,6 +1786,7 @@ class GCMSAgent:
     def _plot_composition(self, title=None):
         import numpy as np
         import matplotlib.pyplot as plt
+        plt.rcParams.update(PUBLICATION_RCPARAMS)
 
         pivot = self.df.pivot_table(values='conc_g100g', index=['group', 'sample'],
                                      columns='compound', aggfunc='mean').fillna(0)
@@ -1788,6 +1817,7 @@ class GCMSAgent:
         import numpy as np
         import matplotlib.pyplot as plt
         import seaborn as sns
+        plt.rcParams.update(PUBLICATION_RCPARAMS)
 
         pivot = self.df.pivot_table(values='conc_g100g', index=['group', 'sample'],
                                      columns='compound', aggfunc='mean').fillna(0)
@@ -3492,6 +3522,117 @@ Next i
         results["note"] = "Profile loaded. Ready to plot — just use /plot or type your request."
 
         return json.dumps(results, ensure_ascii=False)
+
+    # ================================================================
+    # Flavor Analysis Tool Wrappers (delegate to flavor_tools module)
+    # ================================================================
+    def _calculate_oav(self):
+        """Calculate Odor Activity Values for all compounds."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import calculate_oav, get_oav_summary
+        summary = get_oav_summary(self.df)
+        return json.dumps({"status":"done","oav_summary":summary,
+                          "note":f"Top aroma compound: {summary['top_oav_overall'][0]['compound'] if summary['top_oav_overall'] else 'N/A'}"}, ensure_ascii=False)
+
+    def _normalize_istd(self, istd_name='internal standard', istd_conc=1.0):
+        """Normalize by internal standard."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import normalize_istd
+        self.df = normalize_istd(self.df, istd_name, istd_conc)
+        n = int(self.df['conc_normalized'].notna().sum())
+        return json.dumps({"status":"done","istd_name":istd_name,"records_normalized":n,
+                          "note":f"{n} records normalized by ISTD"}, ensure_ascii=False)
+
+    def _subtract_blank(self, blank_sample_name='blank', min_signal_ratio=3.0):
+        """Subtract blank and flag low-S/N compounds."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import subtract_blank
+        self.df = subtract_blank(self.df, blank_sample_name, min_signal_ratio)
+        flagged = int((self.df['blank_flag'] == 'below_blank').sum())
+        return json.dumps({"status":"done","blank_sample":blank_sample_name,
+                          "flagged_below_blank":flagged,
+                          "note":f"Blank subtracted. {flagged} peaks below S/N={min_signal_ratio} flagged."}, ensure_ascii=False)
+
+    def _run_anova(self, alpha=0.05, posthoc_method='tukey'):
+        """Run ANOVA with post-hoc test."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import run_anova
+        result = run_anova(self.df, alpha=alpha, posthoc_method=posthoc_method)
+        result['status'] = 'done'
+        self._anova_results = result  # Store for later use (e.g., Word export)
+        return json.dumps(result, ensure_ascii=False)
+
+    def _flavor_wheel(self, title=None):
+        """Generate flavor wheel radar chart."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import generate_flavor_wheel
+        result = generate_flavor_wheel(self.df, title=title or 'Flavor Profile')
+        return json.dumps(result, ensure_ascii=False)
+
+    def _off_flavor_check(self):
+        """Check for off-flavor compounds."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import get_off_flavor_report
+        result = get_off_flavor_report(self.df)
+        result['status'] = 'done'
+        return json.dumps(result, ensure_ascii=False)
+
+    def _tag_pathways(self):
+        """Tag compounds with formation pathways."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import tag_compounds
+        self.df = tag_compounds(self.df)
+        pathways = self.df['pathway'].value_counts().to_dict()
+        return json.dumps({"status":"done","pathway_counts":{str(k):int(v) for k,v in pathways.items()},
+                          "note":"Compounds tagged by formation pathway (Maillard/Lipid_Oxidation/Off_Flavor/Other). Use /plot or check df for details."}, ensure_ascii=False)
+
+    def _run_plsda(self, n_components=2):
+        """Run PLS-DA analysis."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import run_plsda
+        result = run_plsda(self.df, n_components=n_components)
+        return json.dumps(result, ensure_ascii=False)
+
+    def _run_random_forest(self, n_estimators=100):
+        """Run Random Forest classification."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import run_random_forest
+        result = run_random_forest(self.df, n_estimators=n_estimators)
+        return json.dumps(result, ensure_ascii=False)
+
+    def _html_report(self, title=None):
+        """Generate interactive HTML report."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import generate_html_report
+        result = generate_html_report(self.df, title=title or 'GC-MS Flavor Analysis Report')
+        return json.dumps(result, ensure_ascii=False)
+
+    def _word_tables(self):
+        """Export formatted Word tables."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import export_word_tables
+        anova = getattr(self, '_anova_results', None)
+        result = export_word_tables(self.df, anova_results=anova)
+        return json.dumps(result, ensure_ascii=False)
+
+    def _correct_batch(self):
+        """Correct batch effects."""
+        if self.df is None or 'batch' not in self.df.columns:
+            return json.dumps({"error": "No batch data. Load replicate batches first."}, ensure_ascii=False)
+        from flavor_tools import correct_batch_effect
+        self.df = correct_batch_effect(self.df)
+        return json.dumps({"status":"done","note":"Batch effects corrected. 'value_corrected' column added."}, ensure_ascii=False)
 
     def _match_spectra_library(self, min_match=600):
         """Match detected peaks against spectral library using REAL mass spectra.
@@ -5447,6 +5588,17 @@ def main():
             '/rename': "Rename samples from default IDs to user-friendly display names. Ask: '需要修改样品名吗？例如把 Sample001.D 改成 Raw-MP？' Then use rename_samples with the mapping. ALL samples should be renamed before plotting.",
             '/batch': "Load a replicate experiment batch. Ask the user for the data directory path. Then use load_replicate_batch with the provided directory. IMPORTANT: batch 1 samples must be renamed and grouped first! After loading, all plots will show error bars reflecting batch-to-batch variability.",
             '/profile': "Load (or reload) an experiment profile JSON file. Ask user for the path, then call load_profile. If user says '/profile save', save current state as a profile file for future one-click loading.",
+            '/oav': "Calculate Odor Activity Values (OAV) for all compounds. Call calculate_oav. Shows which compounds actually contribute to aroma (OAV>1).",
+            '/anova': "Run one-way ANOVA across all groups. Call run_anova. Identifies compounds with significant group differences.",
+            '/plsda': "Run PLS-DA to find key discriminating compounds. Call run_plsda. Produces VIP scores ranking compounds by importance.",
+            '/rf': "Run Random Forest to discover flavor markers. Call run_random_forest. Reports feature importance ranking.",
+            '/flavor': "Generate flavor wheel radar chart + off-flavor check. Call flavor_wheel and off_flavor_check.",
+            '/html': "Generate interactive HTML report with Plotly charts. Call html_report.",
+            '/word': "Export results as Word (.docx) tables for manuscript. Call word_tables.",
+            '/batchfix': "Correct batch effects between replicate experiments. Call correct_batch.",
+            '/pathway': "Tag compounds by formation pathway (Maillard/Lipid_Oxidation/Off_Flavor). Call tag_pathways.",
+            '/istd': "Normalize by internal standard. Call normalize_istd. Ask user for ISTD name.",
+            '/blank': "Subtract blank sample signal. Call subtract_blank. Ask user for blank sample name.",
             '/filter': "Filter the current dataset. Ask: what min_area? what min_match? which compounds to exclude? Auto-suggest excluding siloxanes and RT-only peaks.",
             '/plot': "Ask the user which plot(s) to generate: bar (group comparison), heatmap (clustered), pca (score+loading), boxplot (distribution), composition (stacked ratio), volcano (group diff), dashboard (6-panel overview), or all. Then generate only the requested type.",
             '/export': "Show me how to export NIST library search results from MassHunter Qualitative Analysis (to get compound names and match factors)",

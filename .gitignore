@@ -45,3 +45,10 @@ public_libraries/*.jcamp
 
 # Experiment profiles (may contain local paths)
 profile.json
+
+# Docker / deployment
+data/
+*.dockerignore
+
+# Streamlit
+.streamlit/
