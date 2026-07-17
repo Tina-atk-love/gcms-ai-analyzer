@@ -50,6 +50,9 @@ st.markdown("""
     .rova-overwhelming { color: #c0392b; font-weight: bold; font-size: 1.1em; }
     .rova-major { color: #e67e22; font-weight: bold; }
     .rova-significant { color: #2980b9; }
+    .feature-icon { font-size: 2rem; }
+    .card { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px; padding: 20px; border: 1px solid #dee2e6; height: 100%; }
+    .card h4 { color: #1a5276; margin-top: 0.5rem; margin-bottom: 0.3rem; font-size: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -273,14 +276,81 @@ st.markdown('<p class="main-header">🧬 GC-MS AI Analyzer</p>', unsafe_allow_ht
 st.markdown('<p class="sub-header">Open-Source NIST Alternative · Flavor & Compound Analysis</p>', unsafe_allow_html=True)
 
 if not st.session_state.data_loaded:
-    st.info("👈 Load your data from the sidebar to start")
+    # Hero section
     st.markdown("""
-    ### How to use:
-    1. **Set your DeepSeek API Key** in the sidebar
-    2. **Load data**: type a path, upload a ZIP of .D folders, or try demo data
-    3. **Explore**: filter, plot, calculate OAV, run statistics
-    4. **Export**: download plots, Word tables, or interactive HTML reports
-    """)
+    <div style="text-align:center; padding: 1rem 0 2rem 0;">
+        <h1 style="color:#1a5276; font-size:2.5rem; margin-bottom:0.5rem;">GC-MS AI Analyzer</h1>
+        <p style="color:#666; font-size:1.1rem;">Open-Source Alternative to NIST &mdash; AI-Powered Flavor &amp; Compound Analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Feature cards
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown("""
+        <div class="card" style="text-align:center;">
+            <div class="feature-icon">🧬</div>
+            <h4>Agilent .D Support</h4>
+            <p style="font-size:0.85rem;color:#666;">Directly reads ChemStation data files. No export needed.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        st.markdown("""
+        <div class="card" style="text-align:center;">
+            <div class="feature-icon">🔍</div>
+            <h4>Multi-Library Search</h4>
+            <p style="font-size:0.85rem;color:#666;">300K+ compounds: MassBank, MoNA, NIST (local), built-in MSP.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with c3:
+        st.markdown("""
+        <div class="card" style="text-align:center;">
+            <div class="feature-icon">👃</div>
+            <h4>Flavor Analysis</h4>
+            <p style="font-size:0.85rem;color:#666;">OAV, ROVA, flavor wheel, off-flavor DB, pathway tagging.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with c4:
+        st.markdown("""
+        <div class="card" style="text-align:center;">
+            <div class="feature-icon">🤖</div>
+            <h4>AI Agent</h4>
+            <p style="font-size:0.85rem;color:#666;">Natural language: "Find key aroma compounds" &rarr; auto-analyzes.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Demo button
+    demo_col1, demo_col2, demo_col3 = st.columns([1, 2, 1])
+    with demo_col2:
+        if st.button("☕ Try Demo: Coffee Roasting Flavor Analysis", type="primary", use_container_width=True):
+            with st.spinner("Generating demo dataset..."):
+                from tools.demo_data import generate_demo_dataset
+                df = generate_demo_dataset()
+                st.session_state.df = df
+                st.session_state.data_loaded = True
+                st.session_state.data_dir = "Demo: Coffee Roasting Experiment"
+                st.session_state.samples = df['sample'].unique().tolist()
+                st.session_state.compounds = df['compound'].unique().tolist()
+                st.session_state.groups = df['group'].unique().tolist()
+            st.rerun()
+
+    st.markdown("""
+    <div style="text-align:center; color:#999; margin-top:0.5rem;">
+        <small>Or load your own data from the sidebar</small>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+    st.markdown("""
+    <div style="display:flex; justify-content:center; gap:2rem; text-align:center; color:#666; font-size:0.9rem;">
+        <div>📊 <b>48</b> Analysis Tools</div>
+        <div>📚 <b>300K+</b> Spectral Library</div>
+        <div>🌐 <b>Web + CLI</b> Interface</div>
+        <div>🆓 <b>MIT</b> Open Source</div>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 # ---- Tabs ----
