@@ -47,6 +47,9 @@ st.markdown("""
     .oav-dominant { color: #c0392b; font-weight: bold; }
     .oav-significant { color: #e67e22; font-weight: bold; }
     .oav-contributing { color: #2980b9; }
+    .rova-overwhelming { color: #c0392b; font-weight: bold; font-size: 1.1em; }
+    .rova-major { color: #e67e22; font-weight: bold; }
+    .rova-significant { color: #2980b9; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,11 +57,18 @@ st.markdown("""
 for key, default in {
     'agent': None, 'df': None, 'data_loaded': False, 'data_dir': None,
     'profile': None, 'samples': [], 'compounds': [], 'groups': [],
-    'oav_result': None, 'anova_result': None, 'plsda_result': None,
+    'oav_result': None, 'rova_result': None, 'anova_result': None, 'plsda_result': None,
     'rf_result': None, 'plots_generated': {},
+    'nist_loaded': False, 'nist_entries': [], 'nist_name_index': {}, 'nist_db_path': None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
+
+def _inject_nist_to_agent(session):
+    """Pass in-memory NIST data to the agent so it can search locally."""
+    if session.get('nist_loaded') and session.get('agent'):
+        session.agent.nist_entries = session.get('nist_entries', [])
+        session.agent.nist_name_index = session.get('nist_name_index', {})
 
 # ================================================================
 # Sidebar — Configuration
@@ -79,21 +89,79 @@ with st.sidebar:
 
     st.divider()
 
-    # NIST Library (optional)
-    st.markdown("### 🔬 NIST Library (Optional)")
-    st.caption("Point to your licensed NIST JCAMP files. Spectra stay on your machine.")
-    nist_path = st.text_input("NIST library path", value="", placeholder="D:\\NIST_JCAMP",
-                              help="Directory containing .jdx/.msp files exported from NIST MS Search")
-    if nist_path and st.button("📂 Index NIST Library", use_container_width=True):
-        if st.session_state.agent:
-            with st.spinner(f"Scanning {nist_path}..."):
-                r = json.loads(st.session_state.agent._set_nist_path(nist_path))
-                if 'error' not in r:
-                    st.info(f"Found {r.get('total_files',0)} files")
-                    r2 = json.loads(st.session_state.agent._load_nist_library())
-                    st.success(f"Indexed {r2.get('nist_entries',0)} NIST spectra ({r2.get('with_ri',0)} with RI)")
+    # NIST Library (Local Only — No Data Upload)
+    st.markdown("### 🔬 NIST Library (Local)")
+    st.caption("⚖️  Your NIST data stays on this computer — nothing is uploaded.")
+
+    nist_mode = st.radio("NIST format:", ["NIST .L Folder (Recommended)", "JCAMP/MSP Files"],
+                         help=".L Folder = your NIST17.L directory. JCAMP = pre-exported spectra files.")
+
+    if nist_mode == "NIST .L Folder (Recommended)":
+        nist_l_path = st.text_input("NIST .L folder path", value="",
+                                     placeholder="C:\\Users\\...\\Desktop\\NIST17.L",
+                                     help="Select the folder containing header, header.ind, CONDENSE, FULL.D, etc.")
+        if st.button("🔍 Parse NIST Library", use_container_width=True):
+            if nist_l_path and Path(nist_l_path).exists():
+                with st.spinner("Parsing NIST library (this takes ~30s for full NIST17)..."):
+                    try:
+                        from tools.nist_local_server import NISTParser, build_database
+                        parser_obj = NISTParser(nist_l_path)
+                        entries = parser_obj.parse_entries()
+                        if entries:
+                            # Build in-memory search index
+                            st.session_state.nist_entries = entries
+                            st.session_state.nist_name_index = {}
+                            for e in entries:
+                                key = e['name'].lower()
+                                st.session_state.nist_name_index[key] = e
+                            st.session_state.nist_loaded = True
+                            with_formula = sum(1 for e in entries if e.get('formula'))
+                            st.success(f"✅ Loaded {len(entries):,} compounds ({with_formula:,} with formula)")
+                            # Also build SQLite DB for faster search
+                            db_path = Path(nist_l_path).parent / 'nist_local.db'
+                            build_database(entries, db_path)
+                            st.session_state.nist_db_path = str(db_path)
+                            st.info(f"📁 Database saved: {db_path}")
+                        else:
+                            st.error("No valid entries found — check the path.")
+                    except FileNotFoundError as e:
+                        st.error(f"Not a valid NIST .L directory: {e}")
+                    except Exception as e:
+                        st.error(f"Parse failed: {e}")
+            else:
+                st.warning("Please enter a valid NIST .L folder path.")
+
+        if st.session_state.get('nist_loaded'):
+            st.caption(f"📊 {len(st.session_state.nist_entries):,} compounds indexed")
+
+            # Quick search box
+            nist_query = st.text_input("Quick search NIST", placeholder="e.g. caffeine, hexanal, C8H10N4O2",
+                                        key="nist_quick_search")
+            if nist_query:
+                q = nist_query.lower().strip()
+                results = [e for e in st.session_state.nist_entries
+                          if q in e['name'].lower() or (e.get('formula') and q.lower() in e['formula'].lower())][:10]
+                if results:
+                    for r in results:
+                        f_str = f" — *{r['formula']}*" if r.get('formula') else ''
+                        st.write(f"• {r['name']}{f_str}")
                 else:
-                    st.warning(r['error'])
+                    st.caption("No matches")
+
+    else:
+        st.caption("Point to your licensed NIST JCAMP/MSP files. Spectra stay on your machine.")
+        nist_path = st.text_input("NIST library path", value="", placeholder="D:\\NIST_JCAMP",
+                                  help="Directory containing .jdx/.msp files exported from NIST MS Search")
+        if nist_path and st.button("📂 Index NIST Library", use_container_width=True):
+            if st.session_state.agent:
+                with st.spinner(f"Scanning {nist_path}..."):
+                    r = json.loads(st.session_state.agent._set_nist_path(nist_path))
+                    if 'error' not in r:
+                        st.info(f"Found {r.get('total_files',0)} files")
+                        r2 = json.loads(st.session_state.agent._load_nist_library())
+                        st.success(f"Indexed {r2.get('nist_entries',0)} NIST spectra ({r2.get('with_ri',0)} with RI)")
+                    else:
+                        st.warning(r['error'])
 
     st.divider()
 
@@ -108,6 +176,7 @@ with st.sidebar:
                 try:
                     from gcms_agent import GCMSAgent
                     st.session_state.agent = GCMSAgent(data_dir=data_dir)
+                    _inject_nist_to_agent(st.session_state)
                     r = json.loads(st.session_state.agent._extract_all_data(data_dir))
                     if "error" in r:
                         st.error(r["error"])
@@ -129,6 +198,7 @@ with st.sidebar:
                 try:
                     from gcms_agent import GCMSAgent
                     st.session_state.agent = GCMSAgent(data_dir=tmpdir)
+                    _inject_nist_to_agent(st.session_state)
                     r = json.loads(st.session_state.agent._extract_all_data(tmpdir))
                     if "error" in r:
                         st.error(r["error"])
@@ -379,6 +449,55 @@ with tab_flavor:
             st.caption(f"⚠️ {len(no_thresh)} compounds missing odor thresholds")
 
     st.divider()
+
+    # --- ROVA Section ---
+    if st.button("📊 Calculate ROVA (Relative Odor Activity Values)", type="primary"):
+        if st.session_state.agent:
+            with st.spinner("Computing ROVA..."):
+                r = json.loads(st.session_state.agent._calculate_rova())
+                st.session_state.rova_result = r
+        else:
+            from flavor_tools import calculate_rova, get_rova_summary
+            s = get_rova_summary(df)
+            st.session_state.rova_result = {'rova_summary': s}
+
+    if st.session_state.rova_result:
+        s = st.session_state.rova_result['rova_summary']
+        st.markdown("#### Top Aroma-Dominating Compounds (by ROVA %)")
+
+        # Dominance note
+        if s.get('dominance_note'):
+            st.info(f"💡 {s['dominance_note']}")
+
+        rova_data = []
+        for x in s['top_rova_overall'][:15]:
+            if x['dominance'] == 'overwhelming':
+                color, icon = '#c0392b', '🔴'
+            elif x['dominance'] == 'major':
+                color, icon = '#e67e22', '🟠'
+            elif x['dominance'] == 'significant':
+                color, icon = '#2980b9', '🔵'
+            elif x['dominance'] == 'minor':
+                color, icon = '#7f8c8d', '⚪'
+            else:
+                color, icon = '#bdc3c7', '·'
+            rova_data.append({
+                'Rank': len(rova_data) + 1,
+                'Compound': x['compound'],
+                'ROVA %': f"{x['mean_rova_pct']:.1f}%",
+                'Cumul. %': f"{x['cumulative_pct']:.1f}%",
+                'OAV': f"{x['mean_oav']:.1f}",
+                'Dominance': f"{icon} {x['dominance']}",
+            })
+        st.dataframe(pd.DataFrame(rova_data), use_container_width=True, hide_index=True)
+
+        # Distribution bar
+        dist = s.get('rova_distribution', {})
+        if dist:
+            st.caption(f"📈 Dominance distribution: " + " | ".join(
+                f"{k}: {v}" for k, v in dist.items()))
+
+    st.divider()
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🛞 Flavor Wheel", use_container_width=True):
@@ -500,4 +619,4 @@ with tab_export:
 # ---- Footer ----
 st.divider()
 st.caption(f"GC-MS AI Analyzer v3.3.0 · {datetime.now().year} · Open Source MIT License")
-st.caption(f"Library: 29,452 spectra · RI: 2,167 · MoNA API: 1M+ · OAV DB: 120+ compounds")
+st.caption(f"Library: 29,452 spectra · RI: 2,167 · MoNA API: 1M+ · OAV/ROVA DB: 120+ compounds")

@@ -64,4 +64,8 @@ logs/
 
 # Cad files / binary test data
 *.CH
-*.UV
+*.UVnist_local.db
+output/nist17_db/
+output/nist_jcamp_test/
+exporter_settings.json
+tools/nist_exporter/__pycache__/

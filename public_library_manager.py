@@ -831,6 +831,36 @@ class PublicLibraryManager:
 
         return self.stats['total_entries']
 
+    def load_massbank_msp(self, filepath=None):
+        """Load MassBank spectra in MSP/NIST format.
+
+        Auto-detects common locations if filepath not specified.
+        Returns number of entries loaded.
+        """
+        if filepath is None:
+            # Auto-detect common locations
+            candidates = [
+                Path.home() / "Desktop" / "MassBank_NISTformat.msp",
+                Path.home() / "Desktop" / "MassBank_NISTformat.msp",
+                Path("C:/Users") / os.environ.get("USERNAME", "") / "Desktop" / "MassBank_NISTformat.msp",
+            ]
+            for p in candidates:
+                if p.exists():
+                    filepath = str(p)
+                    break
+
+        if not filepath or not Path(filepath).exists():
+            return 0
+
+        try:
+            from public_library_manager import parse_msp_file
+            entries = parse_msp_file(filepath)
+            self._add_entries(entries, 'MassBank_NIST_MSP')
+            return len(entries)
+        except Exception as e:
+            print(f"  Warning: Failed to load MassBank MSP: {e}")
+            return 0
+
     def _add_entries(self, new_entries, source_label):
         """Add entries with deduplication by CAS number."""
         added = 0

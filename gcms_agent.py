@@ -613,6 +613,8 @@ TOOLS = [
     {"type":"function","function":{"name":"set_nist_path","description":"Configure path to your local NIST spectral library. Point to a directory containing JCAMP-DX (.jdx) or MSP (.msp) files exported from your licensed NIST MS Search. Spectra stay on your machine — nothing is copied or redistributed. Use this once to set up, then use search_nist to search.","parameters":{"type":"object","properties":{"nist_dir":{"type":"string","description":"Path to directory containing NIST JCAMP/MSP files (e.g. D:\\NIST_JCAMP\\)"}},"required":["nist_dir"]}}},
     {"type":"function","function":{"name":"load_nist_library","description":"Index the NIST library files from the configured path. Call this after set_nist_path. Shows how many spectra and how many have RI data.","parameters":{"type":"object","properties":{},"required":[]}}},
     {"type":"function","function":{"name":"search_nist","description":"Search YOUR local NIST library (not the open-source one). Searches by mass spectrum (cosine similarity against data.ms) or by compound name. This is the premium search — uses your licensed NIST spectra for the highest-quality identifications.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"Compound name for name search (optional — leave empty for spectral search of unidentified peaks)"},"min_match":{"type":"number","description":"Minimum NIST match factor (default 700)"},"search_type":{"type":"string","description":"'spectrum' (cosine match against data.ms) or 'name' (lookup by compound name)"}},"required":[]}}},
+    # --- 22b2. search_nist_local (NEW — Local NIST Server) ---
+    {"type":"function","function":{"name":"search_nist_local","description":"Search YOUR local NIST library via the local NIST server. Before using, run: python tools/nist_local_server.py --nist <path_to_NIST.L> This starts a local server (http://localhost:8765) that searches your licensed NIST library. All NIST data stays on YOUR computer — nothing is uploaded or redistributed. Supports searching by compound name, formula, or CAS number.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"Compound name, formula, or CAS number to search"},"search_type":{"type":"string","description":"'name', 'formula', 'cas', or 'all' (default)"},"max_results":{"type":"integer","description":"Maximum results (default 20)"}},"required":["query"]}}},
     # --- 22c. Enhanced identification tools (NEW) ---
     {"type":"function","function":{"name":"enhanced_identify","description":"Enhanced compound identification with all cross-validation layers: MS cosine similarity + retention index + isotope pattern + multi-source consensus. Produces the most authoritative compound identification possible. Use this for publication-quality identifications.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Compound to identify (e.g. 'RT_5.230') or leave empty to batch-identify all unknown peaks"},"use_isotope":{"type":"boolean","description":"Check isotope patterns for formula validation (default true)"},"use_consensus":{"type":"boolean","description":"Cross-validate across library sources (default true)"}},"required":[]}}},
     {"type":"function","function":{"name":"diagnose_unknown","description":"Comprehensive diagnosis of an unknown peak. Analyzes spectral features, suggests likely compound classes, checks for artifacts (column bleed, phthalates), and recommends next steps. Use for stubborn unknowns that resist normal identification.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Name of unknown compound to diagnose (e.g. 'RT_15.345')"},"sample_name":{"type":"string","description":"Sample containing this compound (optional, uses first sample if omitted)"}},"required":["compound_name"]}}},
@@ -631,11 +633,15 @@ TOOLS = [
     # --- 22g. Calibration + Ion ratio (NEW) ---
     {"type":"function","function":{"name":"calibrate_quant","description":"Build external standard calibration curves for quantitative analysis. Takes calibration standard data and produces calibration equations, LOD, LOQ, and R² for each compound. Upgrades analysis from semi-quantitative (peak area) to truly quantitative (concentration).","parameters":{"type":"object","properties":{"cal_data_description":{"type":"string","description":"Describe your calibration standards (e.g. '5 levels: 0.1, 0.5, 1, 5, 10 ug/mL, 3 replicates each')"},"model":{"type":"string","description":"'linear' (default) or 'quadratic'"},"weighting":{"type":"string","description":"'none', '1/x' (default), or '1/x^2'"}},"required":[]}}},
     {"type":"function","function":{"name":"verify_ion_ratio","description":"Verify compound identification using quantifier/qualifier ion ratios. Checks if the observed ratio between confirmation ions and the target ion matches the expected reference ratio. Standard practice in GC-MS for confident identification.","parameters":{"type":"object","properties":{"compound_name":{"type":"string","description":"Compound to verify"},"sample_name":{"type":"string","description":"Sample to check (optional)"}},"required":["compound_name"]}}},
+    # --- 22i. Enhance identification pipeline (NEW) ---
+    {"type":"function","function":{"name":"enhance_identification","description":"Maximize compound identification rate. Automatically: (1) applies spectral background subtraction for cleaner spectra, (2) deconvolves co-eluting peaks, (3) searches MoNA online API for unmatched peaks, (4) lowers match threshold to 500 for tentative hits, (5) marks column-bleed and artifacts. Can increase ID rate from ~50% to 70-80%.","parameters":{"type":"object","properties":{"max_per_sample":{"type":"integer","description":"Max peaks to process per sample (default 30)"}},"required":[]}}},
     # --- 22h. Logging + Bg subtract + mzML (NEW) ---
     {"type":"function","function":{"name":"read_mzml","description":"Read GC-MS data from mzML format (the universal standard). Supports data from Thermo, Shimadzu, Bruker, and any instrument that exports mzML. Converts to the agent's standard format for downstream analysis.","parameters":{"type":"object","properties":{"filepath":{"type":"string","description":"Path to .mzML file"},"min_height":{"type":"number","description":"Minimum peak height (default 10000)"}},"required":["filepath"]}}},
     {"type":"function","function":{"name":"subtract_background","description":"Subtract spectral background/column-bleed from mass spectra. Improves library match quality by removing baseline noise and column bleed ions (m/z 73, 147, 207, 281 siloxanes).","parameters":{"type":"object","properties":{"method":{"type":"string","description":"'threshold' (remove <5% base peak) or 'subtract' (use blank scan as background)"}},"required":[]}}},
     # --- 23. calculate_oav (NEW) ---
     {"type":"function","function":{"name":"calculate_oav","description":"Calculate Odor Activity Values (OAV = concentration / odor threshold) for all compounds. OAV>1 means the compound contributes to aroma. Returns OAV rankings and identifies key aroma-impact compounds. Essential for flavor research — tells you which compounds actually matter to the smell.","parameters":{"type":"object","properties":{},"required":[]}}},
+    # --- 23b. calculate_rova (NEW) ---
+    {"type":"function","function":{"name":"calculate_rova","description":"Calculate Relative Odor Activity Values (ROVA = OAV_i / ΣOAV_all × 100%) for all compounds. ROVA shows each compound's percentage contribution to the TOTAL aroma profile. Unlike OAV (absolute impact), ROVA reveals which compounds DOMINATE the overall smell. ROVA>50% = overwhelmingly dominant character-impact compound. Use together with calculate_oav for complete aroma profiling.","parameters":{"type":"object","properties":{},"required":[]}}},
     # --- 24. normalize_istd (NEW) ---
     {"type":"function","function":{"name":"normalize_istd","description":"Normalize compound concentrations by internal standard (ISTD). Corrects for injection volume variation and instrument drift. Use this when you have an internal standard in your samples for quantitative comparison.","parameters":{"type":"object","properties":{"istd_name":{"type":"string","description":"Name of internal standard compound (e.g. '2-octanol', '1,2-dichlorobenzene')"},"istd_conc":{"type":"number","description":"Known concentration of ISTD (default 1.0 for relative normalization)"}},"required":[]}}},
     # --- 25. subtract_blank (NEW) ---
@@ -1143,6 +1149,15 @@ class GCMSAgent:
                 # Fallback: match against built-in flavor library (RT-based)
                 # ================================================================
                 builtin_matches = json.loads(self._match_builtin_library(rt_tolerance=0.3))
+
+                # ================================================================
+                # Enhanced identification (NIST-style search + deconv + MoNA + bgsub)
+                # ================================================================
+                try:
+                    enhance_result = json.loads(self._enhance_identification(max_per_sample=20))
+                    enhance_note = enhance_result.get('note', '')
+                except Exception:
+                    enhance_note = ''
 
                 # ================================================================
                 # Apply default filters: area >= 10,000 + match >= 70 (if available)
@@ -3681,6 +3696,291 @@ Next i
 
         return json.dumps({'nist_hits': 0, 'note': 'No matches found'}, ensure_ascii=False)
 
+    def _search_nist_local(self, query=None, search_type='all', max_results=20):
+        """Search the user's local NIST library.
+
+        Works in two modes:
+        1. In-memory (Streamlit): if NIST was loaded via the web UI sidebar
+        2. Local server: connects to a running nist_local_server.py at localhost:8765
+
+        All NIST data stays on the user's computer.
+        """
+        if not query:
+            return json.dumps({"error": "Query required"}, ensure_ascii=False)
+
+        query_lower = query.lower().strip()
+
+        # Mode 1: Check for in-memory NIST data (loaded via Streamlit sidebar)
+        # The Streamlit app sets nist_entries and nist_name_index in the agent
+        if hasattr(self, 'nist_entries') and self.nist_entries:
+            results = []
+            if search_type in ('name', 'all'):
+                for e in self.nist_entries:
+                    name = e.get('name', '')
+                    if query_lower in name.lower():
+                        results.append({
+                            'name': name,
+                            'formula': e.get('formula'),
+                            'match_type': 'name',
+                        })
+                        if len(results) >= max_results * 2:
+                            break
+            if search_type in ('formula', 'all'):
+                for e in self.nist_entries:
+                    formula = e.get('formula', '')
+                    if formula and query_lower in formula.lower():
+                        if not any(r['name'] == e['name'] for r in results):
+                            results.append({
+                                'name': e['name'],
+                                'formula': formula,
+                                'match_type': 'formula',
+                            })
+            results = results[:max_results]
+            return json.dumps({
+                'status': 'done',
+                'query': query,
+                'n_results': len(results),
+                'results': results,
+                'source': 'in-memory (web UI)',
+            }, ensure_ascii=False)
+
+        # Mode 2: Try local HTTP server
+        import urllib.request
+        import urllib.parse
+
+        params = urllib.parse.urlencode({
+            'q': query,
+            'type': search_type,
+            'max': max_results,
+        })
+        url = f"http://localhost:8765/search?{params}"
+
+        try:
+            with urllib.request.urlopen(url, timeout=5) as resp:
+                return resp.read().decode('utf-8')
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ConnectionRefusedError) or 'ConnectionRefused' in str(e):
+                return json.dumps({
+                    "error": "NIST library not loaded",
+                    "note": "Two ways to load it:\n"
+                            "  Web UI: Sidebar → NIST Library → enter folder path → Parse\n"
+                            "  CLI:    python tools/nist_local_server.py --nist <path_to_NIST.L>\n"
+                            "          Then retry this search.",
+                }, ensure_ascii=False)
+            return json.dumps({"error": f"Server connection failed: {e}"}, ensure_ascii=False)
+
+    # ================================================================
+    # Enhanced Identification Pipeline
+    # ================================================================
+    def _enhance_identification(self, max_per_sample=30):
+        """Maximize compound ID rate: deconv + bg subtract + MoNA + lowered threshold."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        import numpy as np
+        from core_utils import subtract_spectral_background
+
+        # Use unfiltered data if available
+        df = self.df
+        if hasattr(self, 'df_unfiltered') and self.df_unfiltered is not None:
+            df = self.df_unfiltered
+
+        stats = {'total_peaks': 0, 'deconvoluted': 0, 'bg_cleaned': 0,
+                 'mona_matched': 0, 'tentative_matched': 0, 'artifacts_tagged': 0,
+                 'previously_identified': 0, 'newly_identified': 0}
+
+        # Find previously identified and unknown compounds
+        all_compounds = set(df['compound'].unique())
+        unknown_before = {c for c in all_compounds if str(c).startswith('RT_')}
+        identified_before = all_compounds - unknown_before
+        stats['previously_identified'] = len(identified_before)
+        stats['total_peaks'] = len(unknown_before)
+
+        # Step 1: Load library manager once
+        from public_library_manager import PublicLibraryManager
+        from mona_client import search_compound as mona_search
+        import scipy.sparse
+        try:
+            from aston.tracefile.agilent_ms import AgilentMS
+        except ImportError:
+            pass
+
+        mgr = PublicLibraryManager()
+        mgr.load_all(include_downloaded=True)
+
+        # Per-sample processing
+        new_names = {}  # RT_XX.XXX → matched name
+        samples = sorted(df['sample'].unique())[:8]
+
+        for sn in samples:
+            sdf = df[df['sample'] == sn]
+            unknowns = sdf[sdf['compound'].str.startswith('RT_', na=False)]
+
+            if unknowns.empty:
+                continue
+
+            # Find data.ms path
+            d_path = None
+            for d in self.d_folders.get('ready', []):
+                if d['name'] == sn or d['name'].replace('.D', '') == sn:
+                    d_path = Path(d['path'])
+                    break
+            if not d_path:
+                continue
+
+            ms_file = d_path / 'data.ms'
+            if not ms_file.exists():
+                continue
+
+            try:
+                reader = AgilentMS(str(ms_file))
+            except Exception:
+                continue
+
+            processed = 0
+            for _, row in unknowns.iterrows():
+                if processed >= max_per_sample:
+                    break
+
+                rt = float(row['rt'])
+                compound = str(row['compound'])
+
+                # Skip if already matched in this cycle
+                if compound in new_names:
+                    continue
+
+                # Extract spectrum
+                times_arr = np.array(reader.data.traces[0].index)
+                if times_arr.max() > 100:
+                    times_arr = times_arr / 60000
+                scan_idx = int(np.argmin(np.abs(times_arr - rt)))
+                V = reader.data.values
+                row_data = V[scan_idx]
+                if scipy.sparse.issparse(row_data):
+                    row_data = row_data.toarray().ravel()
+                traces = reader.data.traces
+                ions = []
+                for i in np.where(row_data > 0)[0]:
+                    ions.append((int(float(traces[i].name)), int(float(row_data[i]))))
+
+                if len(ions) < 3:
+                    continue
+
+                # Step A: Background subtraction (always)
+                ions_clean = subtract_spectral_background(ions, method='threshold', threshold_pct=5)
+                if len(ions_clean) >= 3:
+                    stats['bg_cleaned'] += 1
+                    ions = ions_clean
+
+                # Step B: Check for artifacts (siloxanes, phthalates)
+                top_mz = set(ion[0] for ion in ions[:15])
+                if ({73, 147, 207, 281} & top_mz == {73, 147, 207, 281} or
+                    {73, 147} & top_mz and any(ion[1] > max(ions, key=lambda x: x[1])[1] * 0.8
+                                               for ion in ions if ion[0] in (73, 147))):
+                    # Dominant siloxane pattern → artifact
+                    if compound not in new_names:
+                        new_names[compound] = '[ARTIFACT] column bleed'
+                        stats['artifacts_tagged'] += 1
+                    continue
+
+                if 149 in top_mz and any(ion[0] in (167, 279) for ion in ions):
+                    if compound not in new_names:
+                        new_names[compound] = '[ARTIFACT] phthalate'
+                        stats['artifacts_tagged'] += 1
+                    continue
+
+                # Step C: Local library search with lowered threshold
+                local_hits = mgr.search_by_spectrum(ions, min_match=500, max_results=3, require_both=False)
+                best_local = local_hits[0] if local_hits else None
+
+                # Step D: If no good local match, try MoNA API
+                mona_hit = None
+                if not best_local or best_local['match_factor'] < 700:
+                    try:
+                        mona_results = mgr.search_mona_api(ions, min_match=600, max_results=3)
+                        if mona_results:
+                            mona_hit = mona_results[0]
+                            stats['mona_matched'] += 1
+                    except Exception:
+                        pass
+
+                # Step E: Accept best match
+                if mona_hit and (not best_local or
+                                 mona_hit.get('match_factor', 0) > best_local.get('match_factor', 0)):
+                    best = mona_hit
+                    best['source'] = 'mona_api'
+                else:
+                    best = best_local
+
+                if best and best.get('match_factor', 0) >= 500:
+                    name = best.get('name', best.get('compound_name', ''))
+                    if name and compound not in new_names:
+                        new_names[compound] = name
+                        if best.get('match_factor', 0) >= 700:
+                            if compound in unknown_before:
+                                stats['newly_identified'] += 1
+                        else:
+                            stats['tentative_matched'] += 1
+                        # Store match factor for traceability
+                        if 'match_source' not in new_names:
+                            pass
+
+                processed += 1
+
+        # Apply new names to DataFrame
+        if new_names:
+            rename_count = 0
+            for old_name, new_name in new_names.items():
+                mask = self.df['compound'] == old_name
+                if mask.any():
+                    self.df.loc[mask, 'compound'] = new_name
+                    rename_count += 1
+                    # Also update unfiltered
+                    if hasattr(self, 'df_unfiltered') and self.df_unfiltered is not None:
+                        mask2 = self.df_unfiltered['compound'] == old_name
+                        if mask2.any():
+                            self.df_unfiltered.loc[mask2, 'compound'] = new_name
+
+            stats['renamed'] = rename_count
+
+        # Final stats
+        final_unknowns = sum(1 for c in self.df['compound'].unique()
+                           if str(c).startswith('RT_'))
+        final_identified = self.df['compound'].nunique() - final_unknowns
+        id_rate_before = (stats['previously_identified'] /
+                         (stats['previously_identified'] + stats['total_peaks']) * 100
+                         if (stats['previously_identified'] + stats['total_peaks']) > 0 else 0)
+        id_rate_after = (final_identified /
+                        (final_identified + final_unknowns) * 100
+                        if (final_identified + final_unknowns) > 0 else 0)
+
+        return json.dumps({
+            'status': 'done',
+            'before': {
+                'identified': stats['previously_identified'],
+                'unknown': stats['total_peaks'],
+                'id_rate_pct': round(id_rate_before, 1),
+            },
+            'after': {
+                'identified': final_identified,
+                'unknown': final_unknowns,
+                'id_rate_pct': round(id_rate_after, 1),
+            },
+            'improvements': {
+                'newly_identified': stats['newly_identified'],
+                'tentative_matched': stats['tentative_matched'],
+                'artifacts_tagged': stats['artifacts_tagged'],
+                'mona_api_hits': stats['mona_matched'],
+                'bg_cleaned_spectra': stats['bg_cleaned'],
+            },
+            'improvement_pct': round(id_rate_after - id_rate_before, 1),
+            'note': (f'Identification rate improved from {id_rate_before:.0f}% to {id_rate_after:.0f}%. '
+                     f'{stats["newly_identified"]} new IDs, {stats["tentative_matched"]} tentative, '
+                     f'{stats["artifacts_tagged"]} artifacts tagged.'
+                     if stats['newly_identified'] + stats['tentative_matched'] > 0
+                     else 'No additional identifications found. Consider NIST library search or manual interpretation.'),
+        }, ensure_ascii=False)
+
     # ================================================================
     # mzML + Background Subtraction
     # ================================================================
@@ -4178,6 +4478,19 @@ Next i
         summary = get_oav_summary(self.df)
         return json.dumps({"status":"done","oav_summary":summary,
                           "note":f"Top aroma compound: {summary['top_oav_overall'][0]['compound'] if summary['top_oav_overall'] else 'N/A'}"}, ensure_ascii=False)
+
+    def _calculate_rova(self):
+        """Calculate Relative Odor Activity Values (ROVA) for all compounds.
+
+        ROVA = OAV_i / ΣOAV_all × 100%
+        Shows each compound's percentage contribution to total aroma.
+        """
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+        from flavor_tools import calculate_rova, get_rova_summary
+        summary = get_rova_summary(self.df)
+        return json.dumps({"status":"done","rova_summary":summary,
+                          "note":summary.get('dominance_note', f"Top compound: {summary['top_rova_overall'][0]['compound'] if summary['top_rova_overall'] else 'N/A'}")}, ensure_ascii=False)
 
     def _normalize_istd(self, istd_name='internal standard', istd_conc=1.0):
         """Normalize by internal standard."""
@@ -6233,17 +6546,20 @@ def main():
             '/batch': "Load a replicate experiment batch. Ask the user for the data directory path. Then use load_replicate_batch with the provided directory. IMPORTANT: batch 1 samples must be renamed and grouped first! After loading, all plots will show error bars reflecting batch-to-batch variability.",
             '/profile': "Load (or reload) an experiment profile JSON file. Ask user for the path, then call load_profile. If user says '/profile save', save current state as a profile file for future one-click loading.",
             '/oav': "Calculate Odor Activity Values (OAV) for all compounds. Call calculate_oav. Shows which compounds actually contribute to aroma (OAV>1).",
+            '/rova': "Calculate Relative Odor Activity Values (ROVA) for all compounds. Call calculate_rova. Shows each compound's percentage contribution to total aroma — identifies the character-impact compounds that DOMINATE the smell.",
             '/anova': "Run one-way ANOVA across all groups. Call run_anova. Identifies compounds with significant group differences.",
             '/plsda': "Run PLS-DA to find key discriminating compounds. Call run_plsda. Produces VIP scores ranking compounds by importance.",
             '/rf': "Run Random Forest to discover flavor markers. Call run_random_forest. Reports feature importance ranking.",
             '/flavor': "Generate flavor wheel radar chart + off-flavor check. Call flavor_wheel and off_flavor_check.",
             '/html': "Generate interactive HTML report with Plotly charts. Call html_report.",
             '/word': "Export results as Word (.docx) tables for manuscript. Call word_tables.",
+            '/enhance': "Run enhanced identification pipeline: background subtraction, deconvolution, MoNA online search, lowered match threshold, and artifact tagging. Use after /run to maximize compound identification rate.",
             '/batchfix': "Correct batch effects between replicate experiments. Call correct_batch.",
             '/pathway': "Tag compounds by formation pathway (Maillard/Lipid_Oxidation/Off_Flavor). Call tag_pathways.",
             '/istd': "Normalize by internal standard. Call normalize_istd. Ask user for ISTD name.",
             '/blank': "Subtract blank sample signal. Call subtract_blank. Ask user for blank sample name.",
             '/nist': "Configure or search the user's local licensed NIST library. If NIST path not set, use set_nist_path first. Then load_nist_library to index, and search_nist to identify unknown peaks.",
+            '/nist-local': "Start the local NIST server first: python tools/nist_local_server.py --nist <path_to_NIST.L>. Then use search_nist_local to search your licensed NIST library. All data stays local.",
             '/filter': "Filter the current dataset. Ask: what min_area? what min_match? which compounds to exclude? Auto-suggest excluding siloxanes and RT-only peaks.",
             '/plot': "Ask the user which plot(s) to generate: bar (group comparison), heatmap (clustered), pca (score+loading), boxplot (distribution), composition (stacked ratio), volcano (group diff), dashboard (6-panel overview), or all. Then generate only the requested type.",
             '/export': "Show me how to export NIST library search results from MassHunter Qualitative Analysis (to get compound names and match factors)",

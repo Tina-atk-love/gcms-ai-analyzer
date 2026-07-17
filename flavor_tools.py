@@ -489,6 +489,153 @@ def get_oav_summary(df, group_col='group', top_n=15):
 
 
 # ================================================================
+# ROVA Calculator — Relative Odor Activity Value
+# ================================================================
+def calculate_rova(df, concentration_col='conc_g100g', threshold_db=None):
+    """Calculate Relative Odor Activity Values (ROVA) for all compounds.
+
+    ROVA = OAV_i / ΣOAV_all × 100%
+
+    ROVA expresses each compound's odor contribution as a percentage of
+    the total aroma profile. Unlike OAV which shows absolute impact,
+    ROVA reveals which compounds *dominate* the overall aroma.
+
+    Interpretation:
+        ROVA > 50%: overwhelmingly dominant — the key character-impact compound
+        ROVA > 20%: major contributor — defines a primary aroma note
+        ROVA > 5%:  significant contributor — noticeable in the blend
+        ROVA > 1%:  minor contributor — part of the background
+        ROVA < 1%:  trace contributor — negligible alone
+
+    Args:
+        df: DataFrame with compound names and concentration values
+        concentration_col: column name for concentration values
+        threshold_db: custom threshold dict (uses ODOR_THRESHOLDS if None)
+
+    Returns:
+        DataFrame with added 'oav', 'rova', 'rova_pct', 'rova_rank', 'aroma_impact' columns
+    """
+    # First calculate OAV
+    df_oav = calculate_oav(df, concentration_col=concentration_col,
+                           threshold_db=threshold_db)
+
+    result = df_oav.copy()
+
+    # Calculate total OAV sum per sample
+    # (only sum over compounds that have valid OAV)
+    total_oav_by_sample = result.groupby('sample')['oav'].transform('sum')
+
+    result['total_oav'] = total_oav_by_sample
+    result['rova'] = np.where(total_oav_by_sample > 0,
+                              result['oav'] / total_oav_by_sample,
+                              0.0)
+    result['rova_pct'] = (result['rova'] * 100).round(2)
+
+    # Rank compounds by ROVA within each sample (1 = highest ROVA)
+    result['rova_rank'] = result.groupby('sample')['rova'].rank(
+        ascending=False, method='min').astype(int)
+
+    return result
+
+
+def get_rova_summary(df, group_col='group', top_n=15):
+    """Generate ROVA summary: relative contribution of each compound to total aroma.
+
+    Returns top aroma-dominating compounds ranked by ROVA, both overall
+    and per experimental group. Includes OAV for cross-reference.
+    """
+    df_rova = calculate_rova(df)
+
+    summary = {
+        'top_rova_overall': [],
+        'top_rova_by_group': {},
+        'rova_distribution': {},
+        'total_oav_by_sample': {},
+    }
+
+    # Top ROVA overall (mean across samples)
+    overall = df_rova.groupby('compound').agg(
+        mean_rova_pct=('rova_pct', 'mean'),
+        mean_oav=('oav', 'mean'),
+    ).sort_values('mean_rova_pct', ascending=False)
+
+    cumulative = 0.0
+    for comp, row in overall.head(top_n).iterrows():
+        val = round(float(row['mean_rova_pct']), 2)
+        oav = round(float(row['mean_oav']), 2)
+        cumulative += val
+        summary['top_rova_overall'].append({
+            'compound': comp,
+            'mean_rova_pct': val,
+            'mean_oav': oav,
+            'cumulative_pct': round(cumulative, 1),
+            'dominance': _classify_rova(val),
+        })
+
+    # By group
+    if group_col in df_rova.columns:
+        for g in df_rova[group_col].unique():
+            gdf = df_rova[df_rova[group_col] == g]
+            gavg = gdf.groupby('compound').agg(
+                mean_rova_pct=('rova_pct', 'mean'),
+                mean_oav=('oav', 'mean'),
+            ).sort_values('mean_rova_pct', ascending=False)
+
+            summary['top_rova_by_group'][str(g)] = []
+            cumulative = 0.0
+            for comp, row in gavg.head(10).iterrows():
+                val = round(float(row['mean_rova_pct']), 2)
+                oav = round(float(row['mean_oav']), 2)
+                cumulative += val
+                summary['top_rova_by_group'][str(g)].append({
+                    'compound': comp,
+                    'mean_rova_pct': val,
+                    'mean_oav': oav,
+                    'cumulative_pct': round(cumulative, 1),
+                    'dominance': _classify_rova(val),
+                })
+
+    # Distribution: how many compounds at each dominance level
+    dominance_counts = df_rova.groupby('compound')['rova_pct'].mean().apply(
+        _classify_rova).value_counts().to_dict()
+    summary['rova_distribution'] = {str(k): int(v) for k, v in dominance_counts.items()}
+
+    # Total OAV per sample (for normalization context)
+    if 'sample' in df_rova.columns:
+        sample_totals = df_rova.groupby('sample')['total_oav'].first()
+        summary['total_oav_by_sample'] = {
+            str(k): round(float(v), 2)
+            for k, v in sample_totals.items()
+        }
+
+    # Top-3 dominance note
+    top3 = summary['top_rova_overall'][:3]
+    if top3:
+        top3_cumulative = sum(c['mean_rova_pct'] for c in top3)
+        summary['dominance_note'] = (
+            f"Top 3 compounds account for {top3_cumulative:.1f}% of total aroma. "
+            f"#{1} {top3[0]['compound']} ({top3[0]['mean_rova_pct']:.1f}%) is the "
+            f"character-impact compound."
+        )
+
+    return summary
+
+
+def _classify_rova(rova_pct):
+    """Classify compound by ROVA dominance level."""
+    if rova_pct > 50:
+        return 'overwhelming'
+    elif rova_pct > 20:
+        return 'major'
+    elif rova_pct > 5:
+        return 'significant'
+    elif rova_pct > 1:
+        return 'minor'
+    else:
+        return 'trace'
+
+
+# ================================================================
 # Internal Standard (ISTD) Normalization
 # ================================================================
 def normalize_istd(df, istd_name='internal standard', istd_conc=1.0):

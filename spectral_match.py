@@ -217,6 +217,263 @@ def category_boost_factor(entry, target_category='food_flavor'):
         return 1.0  # 'other': neutral
 
 
+# ----- Enhanced NIST-Style Search Algorithms -----
+
+# Common EI-MS fragment ions (non-diagnostic, appear in many compounds)
+# These are penalized in NIST-style matching because they provide little
+# discriminatory power for compound identification.
+COMMON_FRAGMENTS = {41, 42, 43, 44, 45, 55, 56, 57, 58, 59, 67, 69, 70, 71, 73, 74, 75, 77, 79, 81, 83, 85, 91, 93, 95, 97, 105, 107, 119, 121, 133, 135, 147, 149}
+
+COMMON_FRAGMENT_PENALTY = 0.5  # Weight reduction for common fragments
+
+
+def weighted_cosine_nist(observed_ions, reference_ions, tolerance=0.5,
+                         penalize_common=True, base_peak_weight=2.0):
+    """NIST-style weighted cosine similarity.
+
+    Improvements over simple cosine:
+      - Penalizes common fragment ions (m/z 41, 43, 55, etc.)
+      - Boosts base peak importance (most diagnostic ion)
+      - Uses forward match (all ref ions must be in observed)
+
+    This produces match factors much closer to NIST MS Search results.
+
+    Args:
+        observed_ions: [(mz, intensity), ...]
+        reference_ions: [(mz, intensity), ...]
+        tolerance: m/z tolerance
+        penalize_common: reduce weight of ubiquitous EI fragments
+        base_peak_weight: multiplier for base peak contribution
+
+    Returns:
+        int: NIST-style match factor 0-999
+    """
+    if not observed_ions or not reference_ions:
+        return 0
+
+    obs_mz = np.array([o[0] for o in observed_ions], dtype=float)
+    obs_int = np.array([o[1] for o in observed_ions], dtype=float)
+
+    # Normalize observed to base peak = 999
+    if obs_int.max() > 0:
+        obs_int = obs_int / obs_int.max() * 999
+
+    ref_mz = np.array([r[0] for r in reference_ions], dtype=float)
+    ref_int = np.array([r[1] for r in reference_ions], dtype=float)
+    if ref_int.max() > 0:
+        ref_int = ref_int / ref_int.max() * 999
+
+    # Find base peaks
+    obs_bp_mz = int(obs_mz[np.argmax(obs_int)])
+    ref_bp_mz = int(ref_mz[np.argmax(ref_int)])
+
+    # Build weight arrays
+    obs_weights = np.ones_like(obs_int)
+    ref_weights = np.ones_like(ref_int)
+
+    if penalize_common:
+        for i, mz in enumerate(obs_mz):
+            if int(mz) in COMMON_FRAGMENTS:
+                obs_weights[i] = COMMON_FRAGMENT_PENALTY
+        for i, mz in enumerate(ref_mz):
+            if int(mz) in COMMON_FRAGMENTS:
+                ref_weights[i] = COMMON_FRAGMENT_PENALTY
+
+    # Boost base peak
+    for i, mz in enumerate(obs_mz):
+        if int(mz) == obs_bp_mz:
+            obs_weights[i] *= base_peak_weight
+    for i, mz in enumerate(ref_mz):
+        if int(mz) == ref_bp_mz:
+            ref_weights[i] *= base_peak_weight
+
+    # Weighted forward match
+    total_ref_sq = float(np.sum((ref_int * ref_weights) ** 2))
+    total_obs_sq = float(np.sum((obs_int * obs_weights) ** 2))
+
+    if total_ref_sq == 0 or total_obs_sq == 0:
+        return 0
+
+    weighted_sum = 0.0
+    matched_count = 0
+    for i in range(len(ref_mz)):
+        diffs = np.abs(obs_mz - ref_mz[i])
+        best_idx = int(np.argmin(diffs))
+        if diffs[best_idx] <= tolerance:
+            w = ref_weights[i] * obs_weights[best_idx]
+            weighted_sum += float(ref_int[i]) * float(obs_int[best_idx]) * w
+            matched_count += 1
+
+    # Penalize unmatched reference ions
+    match_ratio = matched_count / len(ref_mz)
+    if match_ratio < 0.5:
+        weighted_sum *= match_ratio / 0.5  # Severe penalty for <50% ions matched
+
+    cosine = weighted_sum / np.sqrt(total_ref_sq * total_obs_sq)
+    return _scale_to_nist(cosine)
+
+
+def average_apex_spectra(ms_reader, rt_center, n_scans=5):
+    """Average mass spectra across the peak apex for better S/N.
+
+    NIST MS Search typically averages 3-5 scans around the peak apex
+    to reduce noise before library matching.
+
+    Args:
+        ms_reader: Aston AgilentMS reader
+        rt_center: peak apex RT in minutes
+        n_scans: number of scans to average (odd number recommended)
+
+    Returns:
+        [(mz, intensity), ...] — averaged spectrum
+    """
+    import scipy.sparse
+    times = np.array(ms_reader.data.traces[0].index)
+    if times.max() > 100:
+        times = times / 60000
+
+    center_idx = int(np.argmin(np.abs(times - rt_center)))
+    half = n_scans // 2
+    start = max(0, center_idx - half)
+    end = min(len(times), center_idx + half + 1)
+
+    V = ms_reader.data.values
+    traces = ms_reader.data.traces
+
+    # Sum spectra across window
+    summed = np.zeros(len(traces))
+    for idx in range(start, end):
+        row = V[idx]
+        if scipy.sparse.issparse(row):
+            row = row.toarray().ravel()
+        summed += row
+
+    # Average
+    n_actual = end - start
+    if n_actual > 1:
+        summed /= n_actual
+
+    ions = []
+    for i in np.where(summed > 0)[0]:
+        ions.append((int(float(traces[i].name)), int(float(summed[i]))))
+
+    # Normalize to base peak = 999
+    if ions:
+        max_int = max(i[1] for i in ions)
+        if max_int > 0:
+            ions = [(mz, int(i * 999 / max_int)) for mz, i in ions]
+
+    return ions
+
+
+def search_library_nist_style(observed_ions, library_entries, ri_measured=None,
+                               ri_tolerance=50, min_match=600, max_results=10,
+                               penalize_common=True, use_ri_prefilter=True):
+    """NIST-style library search with all enhancements.
+
+    Combines:
+      1. RI pre-filtering (only search within ±ri_tolerance RI window)
+      2. Common fragment penalty
+      3. Base peak boosting
+      4. Forward + reverse + weighted consensus scoring
+
+    This produces match quality very close to NIST MS Search.
+
+    Args:
+        observed_ions: [(mz, intensity), ...]
+        library_entries: list of library dicts with 'peaks', 'ri_exp', 'name', etc.
+        ri_measured: experimental Kovats RI (optional)
+        ri_tolerance: RI window for pre-filtering
+        min_match: minimum match factor
+        max_results: max results
+        penalize_common: use common fragment penalty
+        use_ri_prefilter: restrict search by RI window
+
+    Returns:
+        list of match results sorted by combined score
+    """
+    results = []
+
+    # Build RI pre-filter index
+    candidate_indices = list(range(len(library_entries)))
+
+    if use_ri_prefilter and ri_measured is not None:
+        ri_candidates = []
+        for i in candidate_indices:
+            entry_ri = library_entries[i].get('ri_exp')
+            if entry_ri and abs(entry_ri - ri_measured) <= ri_tolerance:
+                ri_candidates.append(i)
+        if ri_candidates:
+            candidate_indices = ri_candidates
+        # If no RI-filtered candidates, fall back to all (don't miss the compound)
+
+    for idx in candidate_indices:
+        entry = library_entries[idx]
+        ref_ions = entry.get('peaks', [])
+        if not ref_ions or len(ref_ions) < 3:
+            continue
+
+        # Weighted forward match (NIST primary)
+        mf_fwd = weighted_cosine_nist(observed_ions, ref_ions,
+                                       penalize_common=penalize_common)
+
+        if mf_fwd < min_match - 100:  # Coarse filter
+            continue
+
+        # Weighted reverse match
+        mf_rev = weighted_cosine_nist(ref_ions, observed_ions,
+                                       penalize_common=penalize_common)
+
+        # Combined NIST-style score
+        # NIST uses: combined = forward (weighted more) + reverse bonus
+        if mf_fwd >= 700 and mf_rev >= 700:
+            # Both good — pure spectrum match
+            combined = int(mf_fwd * 0.6 + mf_rev * 0.4)
+        elif mf_fwd >= 600:
+            # Forward OK but reverse poor — co-elution likely
+            combined = int(mf_fwd * 0.7 + min(mf_rev, 600) * 0.3)
+        else:
+            combined = int(min(mf_fwd, mf_rev))
+
+        # RI bonus
+        ri_score = 0
+        ri_diff = None
+        if ri_measured is not None and entry.get('ri_exp'):
+            ri_diff = abs(ri_measured - entry['ri_exp'])
+            if ri_diff < 5:
+                ri_score = 200
+            elif ri_diff < 15:
+                ri_score = 150
+            elif ri_diff < 30:
+                ri_score = 100
+            elif ri_diff < 50:
+                ri_score = 50
+            elif ri_diff < 80:
+                ri_score = 10
+            else:
+                ri_score = -100  # Penalty for large mismatch
+
+        combined = max(0, min(999, combined + ri_score))
+
+        if combined >= min_match:
+            results.append({
+                'name': entry.get('name', ''),
+                'cas': entry.get('cas', ''),
+                'formula': entry.get('formula', ''),
+                'match_factor': combined,
+                'match_forward': mf_fwd,
+                'match_reverse': mf_rev,
+                'ri_score': ri_score if ri_score != 0 else 0,
+                'ri_diff': round(ri_diff, 1) if ri_diff else None,
+                'ri_expected': entry.get('ri_exp'),
+                'source': entry.get('source', 'unknown'),
+                'n_ref_peaks': len(ref_ions),
+            })
+
+    results.sort(key=lambda x: x['match_factor'], reverse=True)
+    return results[:max_results]
+
+
 # ----- Main search functions -----
 
 def search_library(observed_ions, library=None, min_match=600,
