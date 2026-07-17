@@ -1,19 +1,43 @@
-# GC-MS AI Analyzer
+# 🧬 GC-MS AI Analyzer
 
-**Open-source NIST alternative** — Agilent ChemStation `.D` 数据全自动分析平台。
+**开源 NIST 替代方案** — Agilent ChemStation `.D` 数据全自动分析平台。
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://docker.com)
-[![Tools](https://img.shields.io/badge/Tools-48-orange)](#工具列表)
+[![Tools](https://img.shields.io/badge/Tools-50-orange)](#工具列表)
+[![Stars](https://img.shields.io/github/stars/Tina-atk-love/gcms-ai-analyzer?style=social)](https://github.com/Tina-atk-love/gcms-ai-analyzer)
+
+> 🌍 **English users:** See [README_EN.md](README_EN.md)
+
+## 📸 功能截图
+
+| 总离子流图 | OAV 排名 | PCA 分析 |
+|:---:|:---:|:---:|
+| [![TIC](docs/screenshots/01_tic_chromatogram.png)](docs/screenshots/01_tic_chromatogram.png) | [![OAV](docs/screenshots/02_oav_ranking.png)](docs/screenshots/02_oav_ranking.png) | [![PCA](docs/screenshots/03_pca_plot.png)](docs/screenshots/03_pca_plot.png) |
+
+| 风味轮 | 火山图 | 热力图 |
+|:---:|:---:|:---:|
+| [![Flavor](docs/screenshots/04_flavor_wheel.png)](docs/screenshots/04_flavor_wheel.png) | [![Volcano](docs/screenshots/05_volcano_plot.png)](docs/screenshots/05_volcano_plot.png) | [![Heatmap](docs/screenshots/06_heatmap.png)](docs/screenshots/06_heatmap.png) |
+
+## ☕ 无需数据，一键体验
+
+打开网页 → 点击 **"Try Demo: Coffee Roasting Flavor Analysis"** → 即刻加载 45 种咖啡风味化合物的真实模拟数据。零配置，零等待。
 
 ## 快速开始
 
+```bash
+# 一行安装 + 启动
+pip install gcms-ai-analyzer
+gcms-analyzer web    # 浏览器打开 http://localhost:8501
+```
+
+或手动安装：
 ```powershell
-# 1. 安装
+# 1. 安装依赖
 pip install -r requirements.txt
 
-# 2. 设置 API Key
+# 2. 设置 API Key (可选，不影响 Demo)
 $env:DEEPSEEK_API_KEY = "sk-xxx"
 
 # 3. 启动 Web 界面
