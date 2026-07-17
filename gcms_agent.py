@@ -374,36 +374,10 @@ TOOLS = [
             }
         }
     },
-    # --- 16. detect_peaks (NEW) ---
-    {
-        "type": "function",
-        "function": {
-            "name": "detect_peaks",
-            "description": "Perform automatic peak detection and integration on TIC chromatogram data. Uses scipy.signal.find_peaks, integrates each peak via trapezoidal rule. Supports min_area filtering. Essential for samples with tic_front.csv but no integrated report.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "prominence": {
-                        "type": "number",
-                        "description": "Minimum peak prominence relative to signal range (default 0.005 = 0.5%). Lower = more peaks."
-                    },
-                    "min_width": {
-                        "type": "number",
-                        "description": "Minimum peak width in data points (default 5)."
-                    },
-                    "min_height": {
-                        "type": "number",
-                        "description": "Minimum absolute peak height (default 10000)."
-                    },
-                    "min_area": {
-                        "type": "number",
-                        "description": "Minimum peak area for inclusion in results (default 10000). Filters noise peaks after detection."
-                    }
-                },
-                "required": []
-            }
-        }
-    },
+    # --- 16. detect_peaks (basic) ---
+    {"type":"function","function":{"name":"detect_peaks","description":"Basic peak detection using scipy.signal.find_peaks with trapezoidal integration. For advanced detection (CWT wavelet, AMDIS-level), use detect_peaks_advanced.","parameters":{"type":"object","properties":{"prominence":{"type":"number","description":"Min peak prominence (default 0.005)"},"min_width":{"type":"number","description":"Min peak width in points (default 5)"},"min_height":{"type":"number","description":"Min peak height (default 10000)"},"min_area":{"type":"number","description":"Min peak area (default 10000)"}},"required":[]}}},
+    # --- 16b. detect_peaks_advanced (NEW - CWT + ALS + shoulder detection) ---
+    {"type":"function","function":{"name":"detect_peaks_advanced","description":"Advanced CWT wavelet peak detection with ALS baseline correction and shoulder detection — AMDIS/MS-DIAL level quality. Produces: peak list with SNR, asymmetry, tailing factor, co-elution flags. Better than basic detect_peaks for complex samples with drifting baseline or co-eluting peaks.","parameters":{"type":"object","properties":{"snr_threshold":{"type":"number","description":"Min signal-to-noise ratio (default 3.0). 2=very sensitive, 5=standard, 10=stringent"},"min_peak_width":{"type":"number","description":"Min peak width in data points (default 3)"}},"required":[]}}},
     # --- 17. set_groups (NEW) ---
     {
         "type": "function",
@@ -2917,6 +2891,46 @@ Next i
             }, ensure_ascii=False)
 
         return json.dumps({"error": "No chromatographic data available"}, ensure_ascii=False)
+
+    def _detect_peaks_advanced(self, snr_threshold=3.0, min_peak_width=3):
+        """Advanced CWT wavelet peak detection with ALS baseline correction."""
+        if self.df is None or 'rt' not in self.df.columns:
+            return json.dumps({"error": "Load chromatographic data first"}, ensure_ascii=False)
+
+        try:
+            from tools.advanced_peak_detection import PeakDetector
+        except ImportError:
+            return json.dumps({"error": "Advanced peak detection not available. Install scipy."}, ensure_ascii=False)
+
+        df = self.df
+        times = sorted(df['rt'].dropna().unique())
+        # Build TIC from area data
+        tic_data = df.groupby('rt')['area'].sum()
+        rt_to_area = dict(tic_data)
+        intensities = np.array([rt_to_area.get(rt, 0) for rt in times])
+
+        detector = PeakDetector(snr_threshold=float(snr_threshold),
+                                min_peak_width=int(min_peak_width))
+        result = detector.process_chromatogram(times, intensities)
+
+        summary = result['summary']
+        peaks = result['peaks']
+
+        # Filter to significant peaks
+        sig_peaks = [p for p in peaks if p['snr'] >= snr_threshold]
+        for p in sig_peaks:
+            p.pop('ridge_length', None)
+
+        return json.dumps({
+            'status': 'done',
+            'algorithm': 'CWT wavelet + ALS baseline',
+            'summary': summary,
+            'n_peaks': len(sig_peaks),
+            'peaks': sig_peaks[:100],  # Top 100 by RT
+            'note': (f"Found {summary['n_major']} major + {summary['n_minor']} minor peaks "
+                     f"({summary['n_shoulders']} shoulders). "
+                     f"Noise level: {summary['noise_level']:.1f}"),
+        }, ensure_ascii=False)
 
     @staticmethod
     def _parse_masshunter_library_csv(filepath):

@@ -285,8 +285,8 @@ if not st.session_state.data_loaded:
 
 # ---- Tabs ----
 df = st.session_state.df
-tab_data, tab_plots, tab_flavor, tab_stats, tab_export = st.tabs(
-    ["📊 Data", "📈 Plots", "👃 Flavor", "📐 Statistics", "📥 Export"]
+tab_data, tab_plots, tab_flavor, tab_stats, tab_viz, tab_export = st.tabs(
+    ["📊 Data", "📈 Plots", "👃 Flavor", "📐 Statistics", "🔬 GC-MS View", "📥 Export"]
 )
 
 # ================================================================
@@ -581,7 +581,155 @@ with tab_stats:
             st.image(rf_path, use_container_width=True)
 
 # ================================================================
-# Tab 5: Export
+# Tab 5: GC-MS Interactive View
+# ================================================================
+with tab_viz:
+    st.markdown("### 🔬 Interactive GC-MS Visualization")
+
+    if st.session_state.data_loaded:
+        df = st.session_state.df
+
+        # Build TIC from data if available
+        has_tic_data = False
+        if 'rt' in df.columns and 'area' in df.columns:
+            has_tic_data = True
+            rt_vals = sorted(df['rt'].dropna().unique())
+            # Aggregate intensities by RT
+            tic_df = df.groupby('rt')['area'].sum().reset_index()
+            times = tic_df['rt'].values
+            intensities = tic_df['area'].values
+
+        if has_tic_data:
+            from tools.interactive_viz import TICPlot, MirrorPlot, GCDashboard
+            from tools.advanced_peak_detection import PeakDetector
+
+            viz_col1, viz_col2 = st.columns([3, 1])
+
+            with viz_col1:
+                st.markdown("#### TIC Chromatogram")
+
+                # Run advanced peak detection
+                if st.button("🔍 Detect Peaks (CWT)", use_container_width=True, key="cwt_detect"):
+                    with st.spinner("Running CWT peak detection..."):
+                        detector = PeakDetector(snr_threshold=5.0)
+                        result = detector.process_chromatogram(times, intensities)
+                        st.session_state.peak_result = result
+                        st.success(f"Found {result['summary']['n_major']} major + "
+                                  f"{result['summary']['n_minor']} minor peaks "
+                                  f"({result['summary']['n_shoulders']} shoulders)")
+
+                if st.session_state.get('peak_result'):
+                    peaks = st.session_state.peak_result['peaks']
+                    # Annotate identified peaks
+                    for p in peaks:
+                        peak_rt = p['rt']
+                        # Find closest compound match
+                        matches = df[abs(df['rt'] - peak_rt) < 0.1]
+                        if len(matches) > 0:
+                            identified = matches[matches['compound'].notna()]
+                            if len(identified) > 0:
+                                p['compound'] = str(identified['compound'].iloc[0])
+
+                    tic_fig = TICPlot.create(
+                        times, intensities, peaks,
+                        title=f'TIC — {st.session_state.data_dir}'
+                    )
+                    st.plotly_chart(tic_fig, use_container_width=True)
+
+                    # Peak table
+                    st.markdown("**Detected Peaks**")
+                    peak_data = []
+                    for p in peaks:
+                        if p.get('snr', 0) >= 5:
+                            peak_data.append({
+                                'RT (min)': f"{p['rt']:.3f}",
+                                'Height': f"{p['height']:.0f}",
+                                'SNR': f"{p['snr']:.1f}",
+                                'Width (pts)': f"{p['width']:.0f}",
+                                'Asym': f"{p.get('asymmetry', 1):.2f}" if p.get('asymmetry') else '-',
+                                'Compound': p.get('compound', '-'),
+                            })
+                    if peak_data:
+                        st.dataframe(pd.DataFrame(peak_data), use_container_width=True, hide_index=True)
+                else:
+                    # Simple TIC without peak detection
+                    simple_fig = TICPlot.create(times, intensities, title='TIC Chromatogram')
+                    st.plotly_chart(simple_fig, use_container_width=True)
+
+            with viz_col2:
+                st.markdown("#### Spectrum Viewer")
+                # Compound selector for mirror plot
+                compounds = sorted(df['compound'].dropna().unique())
+                compounds = [c for c in compounds if str(c) != 'nan' and not str(c).startswith('RT_')]
+                selected_compound = st.selectbox("Compound", compounds[:50] if compounds else ['None'])
+
+                if selected_compound and selected_compound != 'None':
+                    if st.button("🔬 Show Mirror Plot", use_container_width=True):
+                        cdf = df[df['compound'] == selected_compound].iloc[0]
+                        # Get mass spectrum if available
+                        from spectral_match import get_compound_spectrum
+                        try:
+                            from mass_spectra_reader import MassSpectraReader
+                            agent = st.session_state.agent
+                            if agent and hasattr(agent, 'd_folders'):
+                                spec_data = None
+                                for d in agent.d_folders.get('ready', []):
+                                    ms_file = Path(d['path']) / 'data.ms'
+                                    if ms_file.exists():
+                                        try:
+                                            from aston.tracefile.agilent_ms import AgilentMS
+                                            tf = AgilentMS(str(ms_file))
+                                            rt = cdf['rt']
+                                            spec = tf.spectrum_at_time(rt * 60)
+                                            observed = [(mz, int(i)) for mz, i
+                                                       in zip(spec.mz, spec.intensity) if i > 0]
+                                            if observed:
+                                                mirror_fig = MirrorPlot.create(
+                                                    observed[:80],
+                                                    compound_name=selected_compound,
+                                                    sample_name=str(cdf.get('sample', '')),
+                                                )
+                                                st.plotly_chart(mirror_fig, use_container_width=True)
+                                                break
+                                        except Exception:
+                                            pass
+                            else:
+                                st.info("Mass spectrum data not available for this sample.")
+                        except ImportError:
+                            st.info("Aston library required for spectrum extraction.")
+                else:
+                    st.caption("Select a compound to view its spectrum")
+
+            # EIC viewer
+            st.divider()
+            st.markdown("#### Extracted Ion Chromatograms (EIC)")
+            mz_input = st.text_input("m/z values (comma-separated)", "43, 57, 71",
+                                     help="Enter m/z values to overlay their ion chromatograms")
+            if mz_input:
+                try:
+                    mz_list = [int(x.strip()) for x in mz_input.split(',')]
+                    from tools.interactive_viz import EICPlot
+                    # Generate sample EICs from data
+                    eic_dict = {}
+                    for mz in mz_list:
+                        if 'rt' in df.columns:
+                            eic_values = np.zeros_like(times)
+                            for i, rt in enumerate(times):
+                                nearby = df[(abs(df['rt'] - rt) < 0.2)]
+                                if len(nearby) > 0:
+                                    eic_values[i] = nearby['area'].mean()
+                            eic_dict[str(mz)] = eic_values
+                    eic_fig = EICPlot.create(times, eic_dict)
+                    st.plotly_chart(eic_fig, use_container_width=True)
+                except ValueError:
+                    st.warning("Please enter valid m/z values")
+        else:
+            st.info("Load data with RT and Area columns to enable interactive visualization")
+    else:
+        st.info("Load data from the sidebar to start")
+
+# ================================================================
+# Tab 6: Export
 # ================================================================
 with tab_export:
     st.markdown("### 📥 Export Results")
