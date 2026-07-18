@@ -22,6 +22,8 @@ import shutil
 import base64
 from pathlib import Path
 from datetime import datetime
+from tools.i18n import t, lang_selector, get_lang, set_lang
+from tools.config_manager import load_config, save_config
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -56,16 +58,52 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ---- Load saved config ----
+if 'config_loaded' not in st.session_state:
+    saved = load_config()
+    st.session_state.config_loaded = True
+    # Restore language
+    if saved.get('language', 'en') != get_lang():
+        set_lang(saved.get('language', 'en'))
+    # Save for later use
+    st.session_state._saved_config = saved
+
+saved_cfg = st.session_state.get('_saved_config', {})
+
 # ---- Session State Init ----
 for key, default in {
-    'agent': None, 'df': None, 'data_loaded': False, 'data_dir': None,
+    'agent': None, 'df': None, 'data_loaded': False, 'data_dir': saved_cfg.get('data_dir') or None,
     'profile': None, 'samples': [], 'compounds': [], 'groups': [],
     'oav_result': None, 'rova_result': None, 'anova_result': None, 'plsda_result': None,
     'rf_result': None, 'plots_generated': {},
-    'nist_loaded': False, 'nist_entries': [], 'nist_name_index': {}, 'nist_db_path': None,
+    'nist_loaded': saved_cfg.get('nist_loaded', False),
+    'nist_entries': [], 'nist_name_index': {}, 'nist_db_path': saved_cfg.get('nist_db_path'),
+    'replicates_loaded': 0,
+    'nist_input_path': saved_cfg.get('nist_path', ''),
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
+
+# ---- Auto-restore NIST from SQLite DB (instant, no re-parse) ----
+if (st.session_state.get('nist_loaded') and
+    not st.session_state.get('nist_entries') and
+    st.session_state.get('nist_db_path')):
+    db_path = Path(st.session_state.nist_db_path)
+    if db_path.exists():
+        try:
+            import sqlite3
+            conn = sqlite3.connect(str(db_path))
+            entries = []
+            for name, formula in conn.execute("SELECT name, formula FROM compounds").fetchall():
+                entries.append({'name': name, 'formula': formula})
+            conn.close()
+            if entries:
+                st.session_state.nist_entries = entries
+                for e in entries:
+                    st.session_state.nist_name_index[e['name'].lower()] = e
+                print(f"  [Restore] NIST: {len(entries):,} compounds loaded from cache (instant)")
+        except Exception:
+            pass  # Silently fail — user can re-parse
 
 def _inject_nist_to_agent(session):
     """Pass in-memory NIST data to the agent so it can search locally."""
@@ -77,32 +115,78 @@ def _inject_nist_to_agent(session):
 # Sidebar — Configuration
 # ================================================================
 with st.sidebar:
+    lang_selector()
+    st.divider()
     st.image("https://img.icons8.com/color/96/test-tube--v1.png", width=50)
-    st.markdown("## 🧬 GC-MS AI Analyzer")
+    st.markdown(f"## 🧬 {t('app_title')}")
 
     # API Key
+    saved_api = saved_cfg.get('api_key', '') or os.environ.get("DEEPSEEK_API_KEY", '')
     api_key = st.text_input(
-        "DeepSeek API Key",
-        value=os.environ.get("DEEPSEEK_API_KEY", ""),
+        t('sidebar_api_key'),
+        value=saved_api,
         type="password",
-        help="Get one at https://platform.deepseek.com"
+        help=t('sidebar_api_help')
     )
     if api_key:
         os.environ["DEEPSEEK_API_KEY"] = api_key
 
+    # ---- Save/Restore Section ----
+    st.divider()
+    col_save, col_del = st.columns(2)
+    with col_save:
+        if st.button("💾 " + ('Save Settings', '保存设置')[get_lang() == 'zh'], use_container_width=True):
+            cfg = {
+                'api_key': api_key,
+                'nist_path': st.session_state.get('nist_input_path', ''),
+                'data_dir': st.session_state.get('data_dir', ''),
+                'language': get_lang(),
+                'nist_loaded': st.session_state.get('nist_loaded', False),
+                'nist_db_path': st.session_state.get('nist_db_path'),
+                'filter_min_area': st.session_state.get('filter_min_area', 10000),
+                'filter_min_match': st.session_state.get('filter_min_match', 0),
+                'filter_exclude_unidentified': st.session_state.get('filter_exclude_unidentified', True),
+                'filter_exclude_contaminants': st.session_state.get('filter_exclude_contaminants', True),
+            }
+            save_config(cfg)
+            st.success('✅ ' + ('Saved!', '已保存！')[get_lang() == 'zh'])
+            st.toast('💾 ' + ('Settings saved', '设置已保存')[get_lang() == 'zh'])
+    with col_del:
+        if st.button("🗑️ " + ('Reset', '重置')[get_lang() == 'zh'], use_container_width=True):
+            from tools.config_manager import delete_config
+            delete_config()
+            st.session_state.config_loaded = False
+            st.rerun()
+
     st.divider()
 
     # NIST Library (Local Only — No Data Upload)
-    st.markdown("### 🔬 NIST Library (Local)")
-    st.caption("⚖️  Your NIST data stays on this computer — nothing is uploaded.")
+    st.markdown(f"### {t('sidebar_nist')}")
+    st.caption(t('sidebar_nist_caption'))
 
-    nist_mode = st.radio("NIST format:", ["NIST .L Folder (Recommended)", "JCAMP/MSP Files"],
-                         help=".L Folder = your NIST17.L directory. JCAMP = pre-exported spectra files.")
+    _nm_keys = ['NIST .L Folder (Recommended)', 'JCAMP/MSP Files']
+    _nm_labels = [t('sidebar_nist_l_opt'), t('sidebar_nist_jcamp_opt')]
+    nist_mode_idx = st.radio(
+        t('sidebar_nist_format'),
+        range(len(_nm_keys)),
+        format_func=lambda i: _nm_labels[i],
+        index=0,
+        help=".L Folder = your NIST17.L directory. JCAMP = pre-exported spectra files."
+    )
+    nist_mode = _nm_keys[nist_mode_idx]
 
     if nist_mode == "NIST .L Folder (Recommended)":
-        nist_l_path = st.text_input("NIST .L folder path", value="",
-                                     placeholder="C:\\Users\\...\\Desktop\\NIST17.L",
-                                     help="Select the folder containing header, header.ind, CONDENSE, FULL.D, etc.")
+        # Use session state to persist the path
+        if 'nist_input_path' not in st.session_state:
+            st.session_state.nist_input_path = ''
+
+        nist_l_path = st.text_input(t('sidebar_nist_path'),
+                                     value=st.session_state.nist_input_path,
+                                     placeholder=t('sidebar_nist_placeholder'),
+                                     help=t('sidebar_nist_help'),
+                                     key="nist_path_input")
+        st.session_state.nist_input_path = nist_l_path
+
         if st.button("🔍 Parse NIST Library", use_container_width=True):
             if nist_l_path and Path(nist_l_path).exists():
                 with st.spinner("Parsing NIST library (this takes ~30s for full NIST17)..."):
@@ -125,6 +209,14 @@ with st.sidebar:
                             build_database(entries, db_path)
                             st.session_state.nist_db_path = str(db_path)
                             st.info(f"📁 Database saved: {db_path}")
+                            # Auto-save NIST config
+                            save_config({
+                                'api_key': api_key,
+                                'nist_path': nist_l_path,
+                                'nist_loaded': True,
+                                'nist_db_path': str(db_path),
+                                'language': get_lang(),
+                            })
                         else:
                             st.error("No valid entries found — check the path.")
                     except FileNotFoundError as e:
@@ -137,13 +229,26 @@ with st.sidebar:
         if st.session_state.get('nist_loaded'):
             st.caption(f"📊 {len(st.session_state.nist_entries):,} compounds indexed")
 
-            # Quick search box
+            # Quick search box (uses SQLite for instant results)
             nist_query = st.text_input("Quick search NIST", placeholder="e.g. caffeine, hexanal, C8H10N4O2",
                                         key="nist_quick_search")
             if nist_query:
                 q = nist_query.lower().strip()
-                results = [e for e in st.session_state.nist_entries
-                          if q in e['name'].lower() or (e.get('formula') and q.lower() in e['formula'].lower())][:10]
+                results = []
+                # Use SQLite for O(1) search if available, else fall back to in-memory
+                db_path = st.session_state.get('nist_db_path')
+                if db_path and Path(db_path).exists():
+                    import sqlite3
+                    conn = sqlite3.connect(str(db_path))
+                    rows = conn.execute(
+                        "SELECT name, formula FROM compounds WHERE name_lower LIKE ? LIMIT 10",
+                        (f'%{q}%',)
+                    ).fetchall()
+                    conn.close()
+                    results = [{'name': r[0], 'formula': r[1]} for r in rows]
+                else:
+                    results = [e for e in st.session_state.nist_entries
+                              if q in e['name'].lower() or (e.get('formula') and q.lower() in e['formula'].lower())][:10]
                 if results:
                     for r in results:
                         f_str = f" — *{r['formula']}*" if r.get('formula') else ''
@@ -169,11 +274,22 @@ with st.sidebar:
     st.divider()
 
     # Data source
-    st.markdown("### 📂 Data Source")
-    data_source = st.radio("Load from:", ["Local Directory", "Upload .D ZIP", "Demo Data"])
+    st.markdown(f"### {t('sidebar_data_source')}")
+    # Internal keys for radio, display with translation
+    _ds_keys = ['Local Directory', 'Upload .D ZIP', 'Demo Data']
+    _ds_labels = [t('data_local_dir'), t('data_upload_zip'), t('data_demo')]
+    data_source_idx = st.radio(
+        t('sidebar_data_source') + ':',
+        range(len(_ds_keys)),
+        format_func=lambda i: _ds_labels[i],
+        index=0
+    )
+    data_source = _ds_keys[data_source_idx]
 
     if data_source == "Local Directory":
-        data_dir = st.text_input("Data path", value="", placeholder="D:\\Tina")
+        data_dir = st.text_input("Data path", value="",
+                                  placeholder="D:\\Experiment1",
+                                  help="Folder containing .D files, CSV reports, or data.ms files")
         if st.button("🔄 Load Data", use_container_width=True) and data_dir:
             with st.spinner("Scanning and extracting..."):
                 try:
@@ -187,9 +303,32 @@ with st.sidebar:
                         st.session_state.df = st.session_state.agent.df
                         st.session_state.data_loaded = True
                         st.session_state.data_dir = data_dir
-                        st.success(f"✅ {r.get('total_records',0)} peaks, {r.get('n_compounds',0)} compounds")
+                        st.session_state.replicates_loaded = 1
+                        st.success(f"✅ Batch 1: {r.get('total_records',0)} peaks, {r.get('n_compounds',0)} compounds")
                 except Exception as e:
                     st.error(f"Load failed: {e}")
+
+        # ---- Replicate Batch Loading ----
+        if st.session_state.get('replicates_loaded', 0) >= 1:
+            st.divider()
+            st.caption(f"📊 Batch 1 loaded ({st.session_state.get('replicates_loaded', 0)} batch(es)). Load replicate?")
+            repl_dir = st.text_input("Replicate batch path", value="",
+                                      placeholder="D:\\Experiment2 (same samples, repeated)",
+                                      key="repl_path")
+            if repl_dir and st.button("🔄 Load Replicate Batch", use_container_width=True):
+                with st.spinner("Loading replicate batch & merging..."):
+                    try:
+                        r = json.loads(st.session_state.agent._load_replicate_batch(repl_dir))
+                        if "error" in r:
+                            st.error(r["error"])
+                        else:
+                            st.session_state.df = st.session_state.agent.df
+                            st.session_state.replicates_loaded += 1
+                            n = st.session_state.replicates_loaded
+                            st.success(f"✅ Batch {n} merged! {len(st.session_state.df)} total records with {n}-replicate coverage")
+                            st.info("📈 Plots will now show error bars (mean ± range). Statistics use pooled replicates.")
+                    except Exception as e:
+                        st.error(f"Replicate load failed: {e}")
 
     elif data_source == "Upload .D ZIP":
         uploaded = st.file_uploader("Upload .D folders as ZIP", type="zip")
@@ -209,9 +348,28 @@ with st.sidebar:
                         st.session_state.df = st.session_state.agent.df
                         st.session_state.data_loaded = True
                         st.session_state.data_dir = tmpdir
+                        st.session_state.replicates_loaded = 1
                         st.success(f"✅ {r.get('total_records',0)} peaks loaded")
                 except Exception as e:
                     st.error(f"Load failed: {e}")
+
+                # ZIP replicate upload
+                if st.session_state.get('replicates_loaded', 0) >= 1:
+                    st.divider()
+                    st.caption("Load replicate batch ZIP?")
+                    repl_zip = st.file_uploader("Replicate .D ZIP", type="zip", key="repl_zip_upload")
+                    if repl_zip and st.button("🔄 Load Replicate ZIP", use_container_width=True):
+                        with st.spinner("Extracting & merging..."):
+                            tmpdir2 = tempfile.mkdtemp()
+                            with zipfile.ZipFile(repl_zip) as zf:
+                                zf.extractall(tmpdir2)
+                            r = json.loads(st.session_state.agent._load_replicate_batch(tmpdir2))
+                            if "error" in r:
+                                st.error(r["error"])
+                            else:
+                                st.session_state.df = st.session_state.agent.df
+                                st.session_state.replicates_loaded += 1
+                                st.success(f"✅ Merged! Now {st.session_state.replicates_loaded} replicates")
 
     elif data_source == "Demo Data":
         if st.button("🎲 Load Demo", use_container_width=True):
@@ -272,50 +430,50 @@ with st.sidebar:
 # ================================================================
 # Main Content
 # ================================================================
-st.markdown('<p class="main-header">🧬 GC-MS AI Analyzer</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Open-Source NIST Alternative · Flavor & Compound Analysis</p>', unsafe_allow_html=True)
+st.markdown(f'<p class="main-header">🧬 {t("app_title")}</p>', unsafe_allow_html=True)
+st.markdown(f'<p class="sub-header">{t("app_subtitle")}</p>', unsafe_allow_html=True)
 
 if not st.session_state.data_loaded:
     # Hero section
-    st.markdown("""
+    st.markdown(f"""
     <div style="text-align:center; padding: 1rem 0 2rem 0;">
-        <h1 style="color:#1a5276; font-size:2.5rem; margin-bottom:0.5rem;">GC-MS AI Analyzer</h1>
-        <p style="color:#666; font-size:1.1rem;">Open-Source Alternative to NIST &mdash; AI-Powered Flavor &amp; Compound Analysis</p>
+        <h1 style="color:#1a5276; font-size:2.5rem; margin-bottom:0.5rem;">{t('welcome_title')}</h1>
+        <p style="color:#666; font-size:1.1rem;">{t('welcome_subtitle')}</p>
     </div>
     """, unsafe_allow_html=True)
 
     # Feature cards
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.markdown("""
+        st.markdown(f"""
         <div class="card" style="text-align:center;">
             <div class="feature-icon">🧬</div>
-            <h4>Agilent .D Support</h4>
-            <p style="font-size:0.85rem;color:#666;">Directly reads ChemStation data files. No export needed.</p>
+            <h4>{t('feature1_title')}</h4>
+            <p style="font-size:0.85rem;color:#666;">{t('feature1_desc')}</p>
         </div>
         """, unsafe_allow_html=True)
     with c2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="card" style="text-align:center;">
             <div class="feature-icon">🔍</div>
-            <h4>Multi-Library Search</h4>
-            <p style="font-size:0.85rem;color:#666;">300K+ compounds: MassBank, MoNA, NIST (local), built-in MSP.</p>
+            <h4>{t('feature2_title')}</h4>
+            <p style="font-size:0.85rem;color:#666;">{t('feature2_desc')}</p>
         </div>
         """, unsafe_allow_html=True)
     with c3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="card" style="text-align:center;">
             <div class="feature-icon">👃</div>
-            <h4>Flavor Analysis</h4>
-            <p style="font-size:0.85rem;color:#666;">OAV, ROVA, flavor wheel, off-flavor DB, pathway tagging.</p>
+            <h4>{t('feature3_title')}</h4>
+            <p style="font-size:0.85rem;color:#666;">{t('feature3_desc')}</p>
         </div>
         """, unsafe_allow_html=True)
     with c4:
-        st.markdown("""
+        st.markdown(f"""
         <div class="card" style="text-align:center;">
             <div class="feature-icon">🤖</div>
-            <h4>AI Agent</h4>
-            <p style="font-size:0.85rem;color:#666;">Natural language: "Find key aroma compounds" &rarr; auto-analyzes.</p>
+            <h4>{t('feature4_title')}</h4>
+            <p style="font-size:0.85rem;color:#666;">{t('feature4_desc')}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -324,8 +482,8 @@ if not st.session_state.data_loaded:
     # Demo button
     demo_col1, demo_col2, demo_col3 = st.columns([1, 2, 1])
     with demo_col2:
-        if st.button("☕ Try Demo: Coffee Roasting Flavor Analysis", type="primary", use_container_width=True):
-            with st.spinner("Generating demo dataset..."):
+        if st.button(t('btn_try_demo'), type="primary", use_container_width=True):
+            with st.spinner(t('msg_demo_loading')):
                 from tools.demo_data import generate_demo_dataset
                 df = generate_demo_dataset()
                 st.session_state.df = df
@@ -336,19 +494,19 @@ if not st.session_state.data_loaded:
                 st.session_state.groups = df['group'].unique().tolist()
             st.rerun()
 
-    st.markdown("""
+    st.markdown(f"""
     <div style="text-align:center; color:#999; margin-top:0.5rem;">
-        <small>Or load your own data from the sidebar</small>
+        <small>{t('demo_or_load')}</small>
     </div>
     """, unsafe_allow_html=True)
 
     st.divider()
-    st.markdown("""
+    st.markdown(f"""
     <div style="display:flex; justify-content:center; gap:2rem; text-align:center; color:#666; font-size:0.9rem;">
-        <div>📊 <b>48</b> Analysis Tools</div>
-        <div>📚 <b>300K+</b> Spectral Library</div>
-        <div>🌐 <b>Web + CLI</b> Interface</div>
-        <div>🆓 <b>MIT</b> Open Source</div>
+        <div>{t('stat_tools')}</div>
+        <div>{t('stat_library')}</div>
+        <div>{t('stat_interface')}</div>
+        <div>{t('stat_license')}</div>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
@@ -356,7 +514,7 @@ if not st.session_state.data_loaded:
 # ---- Tabs ----
 df = st.session_state.df
 tab_data, tab_plots, tab_flavor, tab_stats, tab_viz, tab_export = st.tabs(
-    ["📊 Data", "📈 Plots", "👃 Flavor", "📐 Statistics", "🔬 GC-MS View", "📥 Export"]
+    [t('tab_data'), t('tab_plots'), t('tab_flavor'), t('tab_stats'), t('tab_viz'), t('tab_export')]
 )
 
 # ================================================================
@@ -365,29 +523,29 @@ tab_data, tab_plots, tab_flavor, tab_stats, tab_viz, tab_export = st.tabs(
 with tab_data:
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("Samples", df['sample'].nunique())
+        st.metric(t('metric_samples'), df['sample'].nunique())
     with c2:
-        st.metric("Compounds", df['compound'].nunique())
+        st.metric(t('metric_compounds'), df['compound'].nunique())
     with c3:
-        st.metric("Records", len(df))
+        st.metric(t('metric_records'), len(df))
     with c4:
         g = df['group'].nunique() if 'group' in df.columns else 1
-        st.metric("Groups", g)
+        st.metric(t('metric_groups'), g)
 
     # Filters
     st.divider()
     fc1, fc2, fc3, fc4 = st.columns(4)
     with fc1:
-        min_area = st.number_input("Min Area", value=10000, step=1000)
+        min_area = st.number_input(t('filter_min_area'), value=10000, step=1000)
     with fc2:
         if 'match_factor' in df.columns:
-            min_match = st.slider("Min Match", 0, 100, 0)
+            min_match = st.slider(t('filter_min_match'), 0, 100, 0)
         else:
             min_match = 0
     with fc3:
-        excl_unid = st.checkbox("Exclude Unidentified", True)
+        excl_unid = st.checkbox(t('filter_excl_unid'), True)
     with fc4:
-        excl_cont = st.checkbox("Exclude Contaminants", True)
+        excl_cont = st.checkbox(t('filter_excl_cont'), True)
 
     # Apply filters
     filtered = df.copy()
@@ -803,6 +961,26 @@ with tab_viz:
 # ================================================================
 with tab_export:
     st.markdown("### 📥 Export Results")
+
+    # One-click comprehensive report
+    if st.button("🚀 Generate Full Analysis Report", type="primary", use_container_width=True):
+        with st.spinner("Running comprehensive analysis..."):
+            try:
+                from tools.comprehensive_report import generate_report
+                report_path = generate_report(st.session_state.df, title='GC-MS Comprehensive Analysis Report')
+                st.success(f"✅ Report generated!")
+                with open(report_path, 'r', encoding='utf-8') as f:
+                    st.download_button(
+                        "📥 Download Full Report (HTML)",
+                        f.read(),
+                        file_name=report_path.name,
+                        mime="text/html",
+                        use_container_width=True
+                    )
+            except Exception as e:
+                st.error(f"Report generation failed: {e}")
+
+    st.divider()
 
     c1, c2, c3 = st.columns(3)
     with c1:
