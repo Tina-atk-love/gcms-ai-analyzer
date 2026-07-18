@@ -70,3 +70,5 @@ output/nist_jcamp_test/
 exporter_settings.json
 tools/nist_exporter/__pycache__/
 deploy_package/
+.gcms_user_config.json
+dist_package/
