@@ -257,19 +257,49 @@ with st.sidebar:
                     st.caption("No matches")
 
     else:
-        st.caption("Point to your licensed NIST JCAMP/MSP files. Spectra stay on your machine.")
-        nist_path = st.text_input("NIST library path", value="", placeholder="D:\\NIST_JCAMP",
-                                  help="Directory containing .jdx/.msp files exported from NIST MS Search")
-        if nist_path and st.button("📂 Index NIST Library", use_container_width=True):
-            if st.session_state.agent:
-                with st.spinner(f"Scanning {nist_path}..."):
-                    r = json.loads(st.session_state.agent._set_nist_path(nist_path))
-                    if 'error' not in r:
-                        st.info(f"Found {r.get('total_files',0)} files")
-                        r2 = json.loads(st.session_state.agent._load_nist_library())
-                        st.success(f"Indexed {r2.get('nist_entries',0)} NIST spectra ({r2.get('with_ri',0)} with RI)")
-                    else:
-                        st.warning(r['error'])
+        # JCAMP: two sub-options
+        jcamp_submode = st.radio("JCAMP source:", ["Exported JCAMP folder (with subdirs)", "Single JCAMP/MSP directory"],
+                                 help="'Exported' = output from tools/nist_export. 'Single' = flat directory of .jdx/.msp files.")
+
+        if jcamp_submode == "Exported JCAMP folder (with subdirs)":
+            jcamp_export_path = st.text_input("Exported JCAMP path", value="",
+                                               placeholder="C:\\Users\\...\\Desktop\\JCAMP_Export",
+                                               help="The folder containing 00000/, 10000/, etc. subdirectories")
+            if jcamp_export_path and st.button("Load NIST Spectra Index", use_container_width=True):
+                with st.spinner("Building spectrum index (~2 min for 306K spectra)..."):
+                    try:
+                        from tools.nist_local_server import SpectrumIndex
+                        if 'nist_spec_index' not in st.session_state:
+                            st.session_state.nist_spec_index = SpectrumIndex()
+                        n = st.session_state.nist_spec_index.load_jcamp_dir(jcamp_export_path)
+                        st.session_state.nist_spectra_loaded = True
+                        st.session_state.nist_jcamp_path = jcamp_export_path
+                        # Also populate metadata for quick search
+                        meta_entries = [{'name': s['name'], 'formula': s.get('formula','')}
+                                       for s in st.session_state.nist_spec_index.spectra]
+                        st.session_state.nist_entries = meta_entries
+                        for e in meta_entries:
+                            st.session_state.nist_name_index[e['name'].lower()] = e
+                        st.session_state.nist_loaded = True
+                        st.success(f"Spectrum index: {n:,} spectra ready for matching + metadata search")
+                    except Exception as e:
+                        st.error(f"Failed: {e}")
+            if st.session_state.get('nist_spectra_loaded'):
+                st.caption(f"Spectra: {len(st.session_state.nist_spec_index.spectra):,} indexed")
+        else:
+            st.caption("Point to your licensed NIST JCAMP/MSP files. Spectra stay on your machine.")
+            nist_path = st.text_input("NIST library path", value="", placeholder="D:\\NIST_JCAMP",
+                                      help="Directory containing .jdx/.msp files exported from NIST MS Search")
+            if nist_path and st.button("Index NIST Library", use_container_width=True):
+                if st.session_state.agent:
+                    with st.spinner(f"Scanning {nist_path}..."):
+                        r = json.loads(st.session_state.agent._set_nist_path(nist_path))
+                        if 'error' not in r:
+                            st.info(f"Found {r.get('total_files',0)} files")
+                            r2 = json.loads(st.session_state.agent._load_nist_library())
+                            st.success(f"Indexed {r2.get('nist_entries',0)} NIST spectra ({r2.get('with_ri',0)} with RI)")
+                        else:
+                            st.warning(r['error'])
 
     st.divider()
 
