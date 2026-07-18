@@ -273,12 +273,171 @@ def build_database(entries, db_path):
 # ================================================================
 # Local HTTP API Server
 # ================================================================
+# ================================================================
+# Spectrum Index & Cosine Search
+# ================================================================
+class SpectrumIndex:
+    """Fast spectrum search index with base-peak pre-screening."""
+
+    def __init__(self):
+        self.spectra = []        # List of {name, formula, cas, peaks: [(mz,int),...]}
+        self.base_peak_idx = {}  # base_peak_mz -> [spectrum_indices]
+        self.loaded = False
+
+    def load_jcamp_dir(self, jcamp_dir):
+        """Scan JCAMP directory (with subdirs) and index all spectra."""
+        import re
+        jcamp_path = Path(jcamp_dir)
+        if not jcamp_path.exists():
+            print(f"  JCAMP dir not found: {jcamp_dir}")
+            return 0
+
+        print(f"  Scanning JCAMP files in {jcamp_dir}...")
+        count = 0
+        t0 = time.time()
+
+        for jdx_file in jcamp_path.rglob("*.jdx"):
+            try:
+                text = jdx_file.read_text(encoding='utf-8', errors='ignore')
+                spec = self._parse_jcamp(text)
+                if spec and spec.get('peaks') and len(spec['peaks']) >= 3:
+                    idx = len(self.spectra)
+                    self.spectra.append(spec)
+                    # Index by base peak
+                    base = max(spec['peaks'], key=lambda x: x[1])[0]
+                    base = (base // 10) * 10  # Round to nearest 10
+                    if base not in self.base_peak_idx:
+                        self.base_peak_idx[base] = []
+                    self.base_peak_idx[base].append(idx)
+                    count += 1
+            except Exception:
+                pass
+
+            if count % 50000 == 0 and count > 0:
+                print(f"    Indexed {count:,} spectra...")
+
+        elapsed = time.time() - t0
+        print(f"  Spectrum index: {count:,} spectra in {elapsed:.0f}s")
+        self.loaded = True
+        return count
+
+    def _parse_jcamp(self, text):
+        """Parse JCAMP-DX text into spectrum dict."""
+        import re
+        spec = {'name': '', 'formula': '', 'cas': '', 'peaks': []}
+        in_peak_table = False
+        for line in text.split('\n'):
+            line = line.strip()
+            if line.startswith('##TITLE='):
+                spec['name'] = line[8:]
+            elif line.startswith('##MOLFORM='):
+                spec['formula'] = line[10:]
+            elif line.startswith('##CAS'):
+                spec['cas'] = line.split('=')[-1] if '=' in line else ''
+            elif '##PEAK TABLE' in line:
+                in_peak_table = True
+            elif line.startswith('##END'):
+                break
+            elif in_peak_table:
+                for pair in line.split():
+                    try:
+                        mz, intensity = pair.split(',')
+                        spec['peaks'].append((int(mz), int(intensity)))
+                    except:
+                        pass
+        return spec if spec['peaks'] else None
+
+    def search_spectrum(self, query_peaks, max_results=20, min_match=600):
+        """Cosine similarity search against indexed spectra.
+
+        Args:
+            query_peaks: list of (mz, intensity) tuples
+            max_results: max results to return
+            min_match: minimum match score (0-999)
+
+        Returns:
+            List of {name, formula, cas, match_score, n_peaks} dicts
+        """
+        if not self.spectra or not query_peaks:
+            return []
+
+        # Pre-screen: find candidate spectra sharing the base peak
+        query_base = max(query_peaks, key=lambda x: x[1])[0]
+        query_base_r = (query_base // 10) * 10
+
+        candidates = set()
+        for delta in [-10, 0, 10]:
+            key = query_base_r + delta
+            if key in self.base_peak_idx:
+                candidates.update(self.base_peak_idx[key])
+
+        if not candidates:
+            # Fall back to broader search
+            candidates = set(range(min(len(self.spectra), 50000)))
+
+        # Normalize query
+        q_max = max(p[1] for p in query_peaks)
+        q_peaks = [(mz, i/q_max) for mz, i in query_peaks]
+
+        results = []
+        for idx in candidates:
+            if idx >= len(self.spectra):
+                continue
+            ref = self.spectra[idx]
+            score = self._cosine_match(q_peaks, ref['peaks'])
+            if score >= min_match:
+                results.append({
+                    'name': ref['name'],
+                    'formula': ref.get('formula', ''),
+                    'cas': ref.get('cas', ''),
+                    'match_score': score,
+                    'n_peaks': len(ref['peaks']),
+                })
+
+        results.sort(key=lambda x: x['match_score'], reverse=True)
+        return results[:max_results]
+
+    def _cosine_match(self, query_peaks, ref_peaks):
+        """Weighted cosine similarity (NIST-style)."""
+        # Normalize reference
+        r_max = max(p[1] for p in ref_peaks)
+        r_norm = [(mz, i/r_max) for mz, i in ref_peaks]
+
+        # Build sparse vectors
+        q_dict = {int(mz): i for mz, i in query_peaks}
+        r_dict = {int(mz): i for mz, i in r_norm}
+
+        # Common fragment penalty
+        common_frags = {41, 43, 55, 57, 69, 71, 73, 77, 79, 81, 83, 85, 91, 93, 95, 97, 105, 107, 119, 121, 133, 135, 147, 149}
+        all_mz = set(q_dict.keys()) | set(r_dict.keys())
+
+        dot = 0.0
+        q_norm = 0.0
+        r_norm_sq = 0.0
+        for mz in all_mz:
+            qi = q_dict.get(mz, 0.0)
+            ri = r_dict.get(mz, 0.0)
+            weight = 0.5 if mz in common_frags else 1.0
+            dot += qi * ri * weight
+            q_norm += qi * qi * weight
+            r_norm_sq += ri * ri * weight
+
+        if q_norm == 0 or r_norm_sq == 0:
+            return 0
+
+        return int((dot / (q_norm ** 0.5 * r_norm_sq ** 0.5)) * 999)
+
+
+# ================================================================
+# Local HTTP API Server
+# ================================================================
 class NISTRequestHandler(BaseHTTPRequestHandler):
     """HTTP handler for local NIST search API.
 
     All endpoints are read-only. No data is modified or uploaded.
     """
-    db_path = None  # Set by server before starting
+    db_path = None      # Set by server before starting
+    spec_index = None   # SpectrumIndex instance
 
     def log_message(self, format, *args):
         """Suppress access logs unless verbose."""
@@ -378,10 +537,32 @@ class NISTRequestHandler(BaseHTTPRequestHandler):
             finally:
                 conn.close()
 
+        elif path == '/search-spectrum':
+            if not self.spec_index or not self.spec_index.loaded:
+                self._send_json({'error': 'Spectrum index not built. Load JCAMP files first.'}, 503)
+                return
+            try:
+                peaks_str = params.get('peaks', [''])[0]
+                min_match = int(params.get('min_match', ['600'])[0])
+                max_results = int(params.get('max', ['20'])[0])
+                # Parse peaks: "43:999,57:850,71:600" format
+                peaks = []
+                for p in peaks_str.split(','):
+                    if ':' in p:
+                        mz, i = p.split(':')
+                        peaks.append((int(mz), int(i)))
+                if not peaks:
+                    self._send_json({'error': 'No peaks provided. Use peaks=43:999,57:850 format'}, 400)
+                    return
+                results = self.spec_index.search_spectrum(peaks, max_results, min_match)
+                self._send_json({'status': 'ok', 'n_results': len(results), 'results': results})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 500)
+
         else:
             self._send_json({
                 'error': 'Unknown endpoint',
-                'available': ['/health', '/stats', '/search?q=<query>&type=<name|formula|all>&max=<n>'],
+                'available': ['/health', '/stats', '/search', '/search-spectrum?peaks=43:999,57:850&min_match=600'],
             }, 404)
 
     def do_OPTIONS(self):
@@ -393,30 +574,41 @@ class NISTRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-def start_server(db_path, port=8765, verbose=False):
+def start_server(db_path, port=8765, verbose=False, jcamp_dir=None):
     """Start local HTTP server.
 
     Args:
         db_path: path to SQLite database
         port: local port to listen on
         verbose: enable request logging
+        jcamp_dir: path to JCAMP export directory (enables spectrum search)
     """
     NISTRequestHandler.db_path = Path(db_path)
+
+    # Load spectrum index if JCAMP dir provided
+    if jcamp_dir and Path(jcamp_dir).exists():
+        print(f"\n  Loading spectrum index from {jcamp_dir}...")
+        spec_idx = SpectrumIndex()
+        n = spec_idx.load_jcamp_dir(jcamp_dir)
+        NISTRequestHandler.spec_index = spec_idx
+        print(f"  Spectrum search: ENABLED ({n:,} spectra)")
 
     server = HTTPServer(('127.0.0.1', port), NISTRequestHandler)
     server.verbose = verbose
 
     print(f"\n{'='*60}")
-    print(f"  🧬 NIST Local Server Running")
+    print(f"  NIST Local Server Running")
     print(f"  {'='*60}")
-    print(f"  URL:      http://localhost:{port}")
-    print(f"  Health:   http://localhost:{port}/health")
-    print(f"  Stats:    http://localhost:{port}/stats")
-    print(f"  Search:   http://localhost:{port}/search?q=caffeine")
+    print(f"  URL:             http://localhost:{port}")
+    print(f"  Health:          http://localhost:{port}/health")
+    print(f"  Stats:           http://localhost:{port}/stats")
+    print(f"  Name Search:     http://localhost:{port}/search?q=caffeine")
+    if NISTRequestHandler.spec_index and NISTRequestHandler.spec_index.loaded:
+        print(f"  Spectrum Search: http://localhost:{port}/search-spectrum?peaks=43:999,57:850")
     print(f"  Database: {db_path}")
     print(f"  {'='*60}")
-    print(f"  ⚠️  Keep this window open while using gcms_analyzer.")
-    print(f"  ⚖️  All NIST data stays on your computer.")
+    print(f"  Keep this window open while using gcms_analyzer.")
+    print(f"  All NIST data stays on your computer.")
     print(f"  Press Ctrl+C to stop.\n")
 
     try:
@@ -461,6 +653,8 @@ Common NIST library locations:
     parser.add_argument('--nist', '-n', help='Path to NIST .L library directory')
     parser.add_argument('--db', '-d', default=None,
                         help='Path to SQLite database (default: nist_local.db next to this script)')
+    parser.add_argument('--jcamp-dir', '-j', default=None,
+                        help='Path to exported JCAMP directory (enables spectrum search)')
     parser.add_argument('--port', '-p', type=int, default=8765, help='Local port (default: 8765)')
     parser.add_argument('--parse-only', action='store_true',
                         help='Only parse library, skip starting server')
@@ -501,7 +695,7 @@ Common NIST library locations:
             print(f"   Example: python nist_local_server.py --nist ~/Desktop/NIST17.L")
             sys.exit(1)
 
-        start_server(db_path, args.port, args.verbose)
+        start_server(db_path, args.port, args.verbose, args.jcamp_dir)
     else:
         print(f"\n✅ Parse complete. Database saved to: {db_path}")
         print(f"   To start server: python nist_local_server.py --db {db_path}")
