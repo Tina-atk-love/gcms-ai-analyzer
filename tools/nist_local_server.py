@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
 """
-🧬 NIST Local Server — Parse & Serve YOUR Licensed NIST Library
+ NIST Local Server — Parse & Serve YOUR Licensed NIST Library
 ==================================================================
 Runs entirely on **your computer**. Reads YOUR licensed NIST MSSEARCH
 library (.L format), creates a searchable local database, and serves
 it via a local HTTP API that the gcms_analyzer connects to.
 
-⚖️  LEGAL: This tool does NOT contain or distribute any NIST data.
+️  LEGAL: This tool does NOT contain or distribute any NIST data.
           It only reads NIST library files that YOU already own.
           No NIST spectra, names, or formulas are ever uploaded.
 
-🔧  How it works:
+  How it works:
     1. You point it at your NIST library folder (e.g. .../NIST17.L/)
     2. It parses the binary format → extracts compound metadata
     3. Creates a local SQLite database (stays on your disk)
     4. Starts a local HTTP server at http://localhost:8765
     5. gcms_analyzer connects to localhost:8765 to search
 
-🚀  Usage:
+  Usage:
     python nist_local_server.py --nist "C:\\NIST17\\MSSEARCH\\mainlib"
     python nist_local_server.py --nist "D:\\Database\\NIST17.L"
     python nist_local_server.py --nist ~/Desktop/NIST17.L --port 8765
 
-📋  Endpoints:
+  Endpoints:
     GET  /search?q=caffeine       — search by name/formula
     GET  /search?q=C8H10N4O2      — search by formula
     GET  /stats                    — database statistics
     GET  /health                   — server health check
 
-🔗  Once running, in gcms_analyzer CLI:
+  Once running, in gcms_analyzer CLI:
     /nist-local          (sets up connection)
     Then agent can call search_nist_local with any query.
 """
@@ -623,10 +623,10 @@ def start_server(db_path, port=8765, verbose=False, jcamp_dir=None):
 # ================================================================
 def main():
     parser = argparse.ArgumentParser(
-        description='🧬 NIST Local Server — Parse & Serve YOUR Licensed NIST Library',
+        description='NIST Local Server - Parse & Serve YOUR Licensed NIST Library',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-⚖️  LEGAL NOTICE:
+LEGAL NOTICE:
     This tool reads NIST library files that YOU already own under license.
     It does NOT contain, distribute, or upload any NIST data.
     All processing happens on your local computer.
@@ -670,34 +670,34 @@ Common NIST library locations:
     if args.nist:
         nist_path = Path(args.nist)
         if not nist_path.exists():
-            print(f"\n❌ Error: NIST library not found at: {args.nist}")
+            print(f"\n Error: NIST library not found at: {args.nist}")
             print(f"   Please verify the path to your NIST .L directory.")
             sys.exit(1)
 
-        print(f"\n📂 Parsing NIST library: {nist_path}")
+        print(f"\n Parsing NIST library: {nist_path}")
         print(f"{'='*60}")
 
         parser_obj = NISTParser(nist_path)
         entries = parser_obj.parse_entries()
 
         if not entries:
-            print("\n❌ No valid entries found. Check that the path points to a NIST .L directory.")
+            print("\n No valid entries found. Check that the path points to a NIST .L directory.")
             sys.exit(1)
 
-        print(f"\n💾 Building database: {db_path}")
+        print(f"\n Building database: {db_path}")
         build_database(entries, db_path)
 
     # Phase 2: Start server
     if not args.parse_only:
         if not Path(db_path).exists():
-            print(f"\n❌ No database found at: {db_path}")
+            print(f"\n No database found at: {db_path}")
             print(f"   Run with --nist first to parse your library, or provide --db with existing database.")
             print(f"   Example: python nist_local_server.py --nist ~/Desktop/NIST17.L")
             sys.exit(1)
 
         start_server(db_path, args.port, args.verbose, args.jcamp_dir)
     else:
-        print(f"\n✅ Parse complete. Database saved to: {db_path}")
+        print(f"\n Parse complete. Database saved to: {db_path}")
         print(f"   To start server: python nist_local_server.py --db {db_path}")
 
 

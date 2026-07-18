@@ -3762,24 +3762,33 @@ Next i
         import urllib.request
         import urllib.parse
 
-        params = urllib.parse.urlencode({
-            'q': query,
-            'type': search_type,
-            'max': max_results,
-        })
-        url = f"http://localhost:8765/search?{params}"
+        # If query looks like spectrum data (contains colon-separated pairs), do spectral search
+        if ':' in query and any(c.isdigit() for c in query.split(':')[0]):
+            # Format: "43:999,57:850,71:600" — spectrum peaks
+            params = urllib.parse.urlencode({
+                'peaks': query,
+                'max': max_results,
+                'min_match': 600,
+            })
+            url = f"http://localhost:8765/search-spectrum?{params}"
+        else:
+            params = urllib.parse.urlencode({
+                'q': query,
+                'type': search_type,
+                'max': max_results,
+            })
+            url = f"http://localhost:8765/search?{params}"
 
         try:
-            with urllib.request.urlopen(url, timeout=5) as resp:
+            with urllib.request.urlopen(url, timeout=10) as resp:
                 return resp.read().decode('utf-8')
         except urllib.error.URLError as e:
             if isinstance(e.reason, ConnectionRefusedError) or 'ConnectionRefused' in str(e):
                 return json.dumps({
-                    "error": "NIST library not loaded",
-                    "note": "Two ways to load it:\n"
-                            "  Web UI: Sidebar → NIST Library → enter folder path → Parse\n"
-                            "  CLI:    python tools/nist_local_server.py --nist <path_to_NIST.L>\n"
-                            "          Then retry this search.",
+                    "error": "NIST server not running",
+                    "note": "Start it:\n"
+                            "  python tools/nist_local_server.py --nist <path_to_NIST.L> --jcamp-dir <path_to_JCAMP>\n"
+                            "  Then retry.",
                 }, ensure_ascii=False)
             return json.dumps({"error": f"Server connection failed: {e}"}, ensure_ascii=False)
 

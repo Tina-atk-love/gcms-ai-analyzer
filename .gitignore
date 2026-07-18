@@ -72,3 +72,4 @@ tools/nist_exporter/__pycache__/
 deploy_package/
 .gcms_user_config.json
 dist_package/
+tools/nist_local.db
