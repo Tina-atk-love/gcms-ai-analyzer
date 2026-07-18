@@ -69,3 +69,4 @@ output/nist17_db/
 output/nist_jcamp_test/
 exporter_settings.json
 tools/nist_exporter/__pycache__/
+deploy_package/
