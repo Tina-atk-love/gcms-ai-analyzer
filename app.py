@@ -128,7 +128,12 @@ def _inject_nist_to_agent(session):
 # ================================================================
 with st.sidebar:
     lang_selector()
+
+    # Plot style selector
+    from tools.plot_engine import plot_style_selector
+    engine = plot_style_selector()
     st.divider()
+
     st.image("https://img.icons8.com/color/96/test-tube--v1.png", width=50)
     st.markdown(f"## 🧬 {t('app_title')}")
 
