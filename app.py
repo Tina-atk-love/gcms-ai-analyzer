@@ -105,6 +105,18 @@ if (st.session_state.get('nist_loaded') and
         except Exception:
             pass  # Silently fail — user can re-parse
 
+def _get_pubchem_cid(name):
+    """Look up PubChem CID for a compound name. Returns CID or None."""
+    import urllib.request, urllib.parse, json as _json
+    try:
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{urllib.parse.quote(name)}/cids/JSON"
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            data = _json.loads(resp.read())
+            cids = data.get('IdentifierList', {}).get('CID', [])
+            return cids[0] if cids else None
+    except:
+        return None
+
 def _inject_nist_to_agent(session):
     """Pass in-memory NIST data to the agent so it can search locally."""
     if session.get('nist_loaded') and session.get('agent'):
@@ -235,7 +247,6 @@ with st.sidebar:
             if nist_query:
                 q = nist_query.lower().strip()
                 results = []
-                # Use SQLite for O(1) search if available, else fall back to in-memory
                 db_path = st.session_state.get('nist_db_path')
                 if db_path and Path(db_path).exists():
                     import sqlite3
@@ -253,6 +264,15 @@ with st.sidebar:
                     for r in results:
                         f_str = f" — *{r['formula']}*" if r.get('formula') else ''
                         st.write(f"• {r['name']}{f_str}")
+                    # PubChem structure for first result
+                    if results and results[0].get('name'):
+                        cid = _get_pubchem_cid(results[0]['name'])
+                        if cid:
+                            img_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/PNG?image_size=200x150"
+                            try:
+                                st.image(img_url, caption=f"Structure: {results[0]['name']}", width=200)
+                            except:
+                                pass
                 else:
                     st.caption("No matches")
 

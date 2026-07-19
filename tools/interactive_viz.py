@@ -519,6 +519,178 @@ def json_to_figure(data):
 # ================================================================
 # CLI Demo
 # ================================================================
+# ================================================================
+# 6. Enhanced Heatmap with Dendrogram + Significance
+# ================================================================
+class EnhancedHeatmap:
+    """Publication-quality heatmap with hierarchical clustering and significance annotations."""
+
+    @staticmethod
+    def create(dataframe, group_col='group', top_n=30, title='Compound Abundance Heatmap'):
+        """Create enhanced heatmap with dendrograms.
+
+        Args:
+            dataframe: pandas DataFrame with columns: compound, sample, area, group
+            group_col: column with group labels
+            top_n: number of top-variable compounds to show
+            title: plot title
+
+        Returns:
+            plotly Figure
+        """
+        from scipy.cluster.hierarchy import linkage, dendrogram
+        from scipy.spatial.distance import pdist
+        from scipy.stats import ttest_ind
+
+        df = dataframe
+
+        # Pivot: compounds x samples
+        pivot = df.pivot_table(values='area', index='compound', columns='sample', aggfunc='mean').fillna(0)
+
+        # Top N by variance
+        variances = pivot.var(axis=1).sort_values(ascending=False)
+        top_compounds = variances.head(top_n).index
+        data = pivot.loc[top_compounds]
+
+        # Log2 transform + z-score normalize
+        data_log = np.log2(data.values + 1)
+        data_z = (data_log - data_log.mean(axis=1, keepdims=True)) / (data_log.std(axis=1, keepdims=True) + 1e-10)
+
+        # Hierarchical clustering on compounds (rows)
+        row_dist = pdist(data_z)
+        row_linkage = linkage(row_dist, method='ward')
+        row_dendro = dendrogram(row_linkage, no_plot=True)
+        row_order = row_dendro['leaves']
+
+        # Clustering on samples (columns)
+        col_dist = pdist(data_z.T)
+        col_linkage = linkage(col_dist, method='ward')
+        col_dendro = dendrogram(col_linkage, no_plot=True)
+        col_order = col_dendro['leaves']
+
+        # Reorder data
+        data_ordered = data_z[row_order, :][:, col_order]
+        compounds_ordered = [top_compounds[i] for i in row_order]
+        samples_ordered = [data.columns[i] for i in col_order]
+
+        # Significance test between groups
+        sig_markers = []
+        if group_col and group_col in df.columns:
+            groups = df.groupby('sample')[group_col].first()
+            unique_groups = list(groups.unique())
+            if len(unique_groups) == 2:
+                g1, g2 = unique_groups
+                g1_samples = groups[groups == g1].index
+                g2_samples = groups[groups == g2].index
+                for i, comp in enumerate(compounds_ordered):
+                    v1 = data.loc[comp, g1_samples].values
+                    v2 = data.loc[comp, g2_samples].values
+                    if len(v1) >= 2 and len(v2) >= 2:
+                        _, p = ttest_ind(v1, v2)
+                        if p < 0.05:
+                            sig_markers.append({'row': i, 'p': p})
+
+        # Build heatmap
+        fig = go.Figure()
+
+        # Main heatmap
+        fig.add_trace(go.Heatmap(
+            z=data_ordered,
+            x=[str(s) for s in samples_ordered],
+            y=[str(c)[:50] for c in compounds_ordered],
+            colorscale='RdBu_r',
+            zmid=0,
+            hovertemplate='Compound: %{y}<br>Sample: %{x}<br>Z-score: %{z:.2f}<extra></extra>',
+            colorbar=dict(title='Z-score', thickness=15),
+        ))
+
+        # Significance markers (*)
+        for m in sig_markers:
+            fig.add_annotation(
+                x=len(samples_ordered) + 0.5,
+                y=m['row'],
+                text='*' if m['p'] < 0.05 else '**',
+                showarrow=False,
+                font=dict(size=12, color='#c0392b' if m['p'] < 0.01 else '#e67e22'),
+            )
+
+        fig.update_layout(
+            title=dict(text=title, font=dict(size=16)),
+            xaxis=dict(title='Sample', tickangle=45),
+            yaxis=dict(title='Compound', tickfont=dict(size=9)),
+            template='plotly_white',
+            height=max(500, top_n * 15 + 100),
+            margin=dict(l=20, r=60, t=50, b=100),
+        )
+
+        return fig
+
+
+# ================================================================
+# 7. SCI-Quality Figure Export
+# ================================================================
+def export_sci_figure(fig_or_func, filepath, figsize=(8, 6), dpi=300, fmt='png'):
+    """Export publication-quality figure for journal submission.
+
+    Args:
+        fig_or_func: matplotlib Figure or callable that creates one
+        filepath: output path (.png, .tiff, .pdf, .svg)
+        figsize: (width_inches, height_inches)
+        dpi: resolution (300 for most journals, 600 for line art)
+        fmt: 'png', 'tiff', 'pdf', 'svg'
+
+    Returns:
+        Path to saved file
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    # Journal-quality rcParams
+    sci_rc = {
+        'font.family': 'serif',
+        'font.serif': ['Times New Roman', 'DejaVu Serif'],
+        'mathtext.fontset': 'stix',
+        'font.size': 8,
+        'axes.titlesize': 9,
+        'axes.labelsize': 8,
+        'xtick.labelsize': 7,
+        'ytick.labelsize': 7,
+        'legend.fontsize': 7,
+        'figure.dpi': dpi,
+        'savefig.dpi': dpi,
+        'savefig.bbox': 'tight',
+        'savefig.pad_inches': 0.05,
+        'figure.facecolor': 'white',
+        'axes.facecolor': 'white',
+        'axes.edgecolor': '.15',
+        'axes.linewidth': 0.8,
+        'axes.grid': False,
+        'lines.linewidth': 1.2,
+        'lines.markersize': 4,
+    }
+    orig_rc = {k: plt.rcParams.get(k) for k in sci_rc}
+    plt.rcParams.update(sci_rc)
+
+    try:
+        if callable(fig_or_func):
+            fig = fig_or_func(figsize)
+        else:
+            fig = fig_or_func
+
+        fig.set_size_inches(figsize)
+        fig.savefig(filepath, dpi=dpi, format=fmt)
+
+        # Also save as PDF (vector) for journals that prefer it
+        if fmt != 'pdf':
+            pdf_path = str(Path(filepath).with_suffix('.pdf'))
+            fig.savefig(pdf_path, dpi=dpi, format='pdf')
+
+        return Path(filepath)
+    finally:
+        plt.rcParams.update(orig_rc)
+
+
 if __name__ == '__main__':
     import tempfile
 
