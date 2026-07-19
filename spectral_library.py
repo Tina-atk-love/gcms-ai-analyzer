@@ -1,8 +1,13 @@
 """
 Public-domain mass spectral library for flavor/aroma compounds
-Format: MSP (NIST-compatible)
-Sources: MoNA (MassBank of North America), NIST WebBook, HMDB
-~150 compounds, ~75KB
+Format: MSP (NIST-compatible), ~196 compounds
+
+Source licenses (all public domain / open access):
+  - MoNA (MassBank of North America): CC0 1.0 Universal — https://mona.fiehnlab.ucdavis.edu
+  - NIST WebBook: US Government public domain — https://webbook.nist.gov
+  - HMDB (Human Metabolome Database): CC BY-NC 4.0 / custom open license — https://hmdb.ca
+
+NO commercial NIST/Agilent spectral data is included in this file.
 """
 
 # MSP format spectral library

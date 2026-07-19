@@ -38,23 +38,501 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---- CSS ----
+# ---- Modern Design System CSS ----
 st.markdown("""
 <style>
-    .main-header { font-size: 2rem; font-weight: bold; color: #1a5276; margin-bottom: 0; }
-    .sub-header { font-size: 0.9rem; color: #666; margin-top: 0; }
-    .metric-card { background: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; }
-    .metric-value { font-size: 1.8rem; font-weight: bold; color: #1a5276; }
-    .metric-label { font-size: 0.8rem; color: #666; }
-    .oav-dominant { color: #c0392b; font-weight: bold; }
-    .oav-significant { color: #e67e22; font-weight: bold; }
-    .oav-contributing { color: #2980b9; }
-    .rova-overwhelming { color: #c0392b; font-weight: bold; font-size: 1.1em; }
-    .rova-major { color: #e67e22; font-weight: bold; }
-    .rova-significant { color: #2980b9; }
-    .feature-icon { font-size: 2rem; }
-    .card { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px; padding: 20px; border: 1px solid #dee2e6; height: 100%; }
-    .card h4 { color: #1a5276; margin-top: 0.5rem; margin-bottom: 0.3rem; font-size: 1rem; }
+/* ============================================================
+   ROOT VARIABLES
+   ============================================================ */
+:root {
+    --primary: #1e40af;
+    --primary-600: #2563eb;
+    --primary-400: #60a5fa;
+    --accent: #06b6d4;
+    --accent-500: #0ea5e9;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --surface: #ffffff;
+    --bg: #f8fafc;
+    --bg-alt: #f1f5f9;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --text: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+    --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
+    --shadow-xl: 0 20px 40px -10px rgba(0,0,0,0.1), 0 10px 20px -8px rgba(0,0,0,0.06);
+    --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* ============================================================
+   GLOBAL OVERRIDES
+   ============================================================ */
+.stApp { background: var(--bg); }
+.stMainBlock { max-width: 1400px; margin: 0 auto; }
+
+/* Hide Streamlit branding */
+[data-testid="stToolbar"] { display: none !important; }
+[data-testid="stDecoration"] { display: none !important; }
+header[data-testid="stHeader"] { background: transparent !important; }
+footer { display: none !important; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ============================================================
+   TOP GRADIENT BAR
+   ============================================================ */
+.stMainBlock::before {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-400) 40%, var(--accent) 70%, var(--success) 100%);
+    z-index: 99999; pointer-events: none;
+}
+
+/* ============================================================
+   SIDEBAR — Glassmorphism Modern
+   ============================================================ */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, rgba(248,250,252,0.95) 0%, rgba(241,245,249,0.98) 100%) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-right: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+[data-testid="stSidebar"] .st-emotion-cache-1avcm0n {
+    padding-top: 0.5rem;
+}
+[data-testid="stSidebar"] h2 {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em;
+    color: var(--primary) !important;
+}
+[data-testid="stSidebar"] h3 {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: var(--text) !important;
+    padding-left: 0.5rem;
+    border-left: 3px solid var(--primary-400);
+    margin-top: 1.25rem;
+}
+[data-testid="stSidebar"] label {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: var(--text-secondary) !important;
+}
+[data-testid="stSidebar"] .stButton > button {
+    border-radius: var(--radius-sm) !important;
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+    transition: var(--transition) !important;
+    border: none !important;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md) !important;
+}
+[data-testid="stSidebar"] .stTextInput > div > div > input,
+[data-testid="stSidebar"] .stTextInput input {
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid var(--border) !important;
+    font-size: 0.875rem !important;
+    transition: var(--transition) !important;
+}
+[data-testid="stSidebar"] .stTextInput > div > div > input:focus,
+[data-testid="stSidebar"] .stTextInput input:focus {
+    border-color: var(--primary-400) !important;
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.15) !important;
+}
+[data-testid="stSidebar"] hr {
+    border-color: var(--border) !important;
+    margin: 1rem 0 !important;
+}
+[data-testid="stSidebar"] .stRadio label,
+[data-testid="stSidebar"] .stSelectbox label {
+    font-size: 0.85rem !important;
+}
+[data-testid="stSidebar"] .stCaption {
+    font-size: 0.78rem !important;
+    color: var(--text-muted) !important;
+}
+
+/* Sidebar collapsible groups */
+[data-testid="stSidebar"] .stExpander {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    background: var(--surface) !important;
+    margin-bottom: 0.5rem;
+    box-shadow: var(--shadow-xs) !important;
+}
+
+/* ============================================================
+   MAIN HEADER / HERO
+   ============================================================ */
+.main-header {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0;
+    animation: fadeIn 0.6s ease;
+}
+.sub-header { font-size: 0.95rem; color: var(--text-secondary); margin-top: 0.25rem; font-weight: 400; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ============================================================
+   MODERN CARD SYSTEM
+   ============================================================ */
+.card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+.card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--primary-400), var(--accent));
+    opacity: 0; transition: var(--transition);
+}
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    border-color: #cbd5e1;
+}
+.card:hover::before { opacity: 1; }
+.card h4 {
+    color: var(--text);
+    margin: 0.5rem 0 0.3rem 0;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.card p { font-size: 0.87rem; color: var(--text-secondary); line-height: 1.5; margin: 0; }
+
+/* Feature card icon */
+.feature-icon {
+    font-size: 2.4rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    transition: var(--transition);
+}
+.card:hover .feature-icon { transform: scale(1.1); }
+
+/* ============================================================
+   METRIC CARDS
+   ============================================================ */
+.metric-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    text-align: center;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+.metric-card::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transform: scaleX(0); transition: transform 0.3s ease;
+    transform-origin: left;
+}
+.metric-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.metric-card:hover::after { transform: scaleX(1); }
+.metric-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+.metric-label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; margin-top: 2px; }
+
+/* ============================================================
+   SEVERITY STATUS CLASSES
+   ============================================================ */
+.oav-dominant { color: #dc2626; font-weight: 700; }
+.oav-significant { color: #ea580c; font-weight: 700; }
+.oav-contributing { color: #2563eb; font-weight: 600; }
+.rova-overwhelming { color: #dc2626; font-weight: 700; font-size: 1.05em; }
+.rova-major { color: #ea580c; font-weight: 700; }
+.rova-significant { color: #2563eb; font-weight: 600; }
+
+/* ============================================================
+   BUTTON ENHANCEMENTS
+   ============================================================ */
+.stButton > button {
+    border-radius: var(--radius-sm) !important;
+    font-weight: 600 !important;
+    transition: var(--transition) !important;
+    border: none !important;
+}
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md) !important;
+    filter: brightness(1.05);
+}
+.stButton > button:active { transform: translateY(0); }
+
+/* Primary button */
+button[kind="primary"], .stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-600) 100%) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(30,64,175,0.25) !important;
+}
+button[kind="primary"]:hover { box-shadow: 0 4px 14px rgba(30,64,175,0.35) !important; }
+
+/* Secondary button */
+button[kind="secondary"] {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* ============================================================
+   TABS — Modern Underline
+   ============================================================ */
+[data-testid="stTabs"] {
+    background: var(--surface);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 0.5rem 1rem 0 1rem;
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-xs);
+}
+[data-testid="stTabs"] button {
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    color: var(--text-secondary) !important;
+    border: none !important;
+    padding: 0.75rem 1.25rem !important;
+    transition: var(--transition) !important;
+    position: relative;
+    background: transparent !important;
+}
+[data-testid="stTabs"] button:hover {
+    color: var(--primary) !important;
+    background: rgba(59,130,246,0.05) !important;
+}
+[data-testid="stTabs"] button[aria-selected="true"] {
+    color: var(--primary) !important;
+    border-bottom: 3px solid var(--primary-400) !important;
+    background: transparent !important;
+}
+
+/* ============================================================
+   DATAFRAME / TABLE STYLING
+   ============================================================ */
+[data-testid="stDataFrame"] {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+[data-testid="stDataFrame"] th {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    color: var(--text-secondary) !important;
+    padding: 10px 14px !important;
+    border-bottom: 2px solid var(--border) !important;
+}
+[data-testid="stDataFrame"] td {
+    font-size: 0.875rem !important;
+    padding: 8px 14px !important;
+    border-bottom: 1px solid var(--border-light) !important;
+}
+[data-testid="stDataFrame"] tbody tr:hover { background: rgba(59,130,246,0.03) !important; }
+[data-testid="stDataFrame"] tbody tr:nth-child(even) { background: rgba(0,0,0,0.01); }
+
+/* ============================================================
+   EXPANDER STYLING
+   ============================================================ */
+.stExpander {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow-xs);
+    transition: var(--transition);
+}
+.stExpander:hover { border-color: #cbd5e1; }
+
+/* ============================================================
+   WELCOME / HERO SECTION
+   ============================================================ */
+.gcms-hero {
+    text-align: center;
+    padding: 2.5rem 1rem 1.5rem 1rem;
+    animation: fadeIn 0.5s ease;
+}
+.gcms-hero h1 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 70%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.75rem;
+}
+.gcms-hero p {
+    color: var(--text-secondary);
+    font-size: 1.15rem;
+    max-width: 650px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+.gcms-hero .hero-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(30,64,175,0.08) 0%, rgba(6,182,212,0.08) 100%);
+    border: 1px solid rgba(30,64,175,0.12);
+    border-radius: 50px;
+    padding: 0.4rem 1.2rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.02em;
+}
+
+/* Welcome step cards */
+.step-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    box-shadow: var(--shadow-xs);
+    transition: var(--transition);
+}
+.step-card:hover { box-shadow: var(--shadow-sm); border-color: #cbd5e1; }
+.step-num {
+    width: 32px; height: 32px; min-width: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.9rem;
+}
+
+/* CTA demo button wrapper */
+.hero-cta {
+    background: linear-gradient(135deg, rgba(30,64,175,0.04) 0%, rgba(6,182,212,0.06) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Stat bar */
+.stat-bar {
+    display: flex; justify-content: center; gap: 2.5rem;
+    text-align: center; color: var(--text-secondary); font-size: 0.9rem;
+    padding: 0.5rem 0;
+}
+.stat-bar span { font-weight: 500; }
+
+/* ============================================================
+   SELECTBOX / INPUTS
+   ============================================================ */
+.stSelectbox [data-baseweb="select"] > div {
+    border-radius: var(--radius-sm) !important;
+    border-color: var(--border) !important;
+    transition: var(--transition) !important;
+}
+.stSelectbox [data-baseweb="select"] > div:focus-within {
+    border-color: var(--primary-400) !important;
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.12) !important;
+}
+
+/* Checkbox */
+.stCheckbox label { font-size: 0.875rem !important; }
+
+/* Number input */
+.stNumberInput input {
+    border-radius: var(--radius-sm) !important;
+    border-color: var(--border) !important;
+}
+
+/* ============================================================
+   DIVIDERS
+   ============================================================ */
+hr {
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, var(--border), transparent) !important;
+    margin: 1.5rem 0 !important;
+}
+
+/* ============================================================
+   TOAST / SUCCESS / ERROR
+   ============================================================ */
+[data-testid="stSuccess"] { border-left: 4px solid var(--success) !important; border-radius: var(--radius-sm) !important; }
+[data-testid="stError"] { border-left: 4px solid var(--danger) !important; border-radius: var(--radius-sm) !important; }
+[data-testid="stWarning"] { border-left: 4px solid var(--warning) !important; border-radius: var(--radius-sm) !important; }
+[data-testid="stInfo"] { border-left: 4px solid var(--accent) !important; border-radius: var(--radius-sm) !important; }
+
+/* ============================================================
+   PROGRESS / SPINNER
+   ============================================================ */
+.stProgress > div > div {
+    background: linear-gradient(90deg, var(--primary), var(--accent)) !important;
+}
+
+/* ============================================================
+   DOWNLOAD BUTTON
+   ============================================================ */
+.stDownloadButton > button {
+    border-radius: var(--radius-sm) !important;
+    font-weight: 600 !important;
+    transition: var(--transition) !important;
+}
+.stDownloadButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.gcms-footer {
+    text-align: center;
+    padding: 1rem 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    margin-top: 1.5rem;
+}
+.gcms-footer strong { color: var(--text-secondary); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,12 +606,7 @@ def _inject_nist_to_agent(session):
 # ================================================================
 with st.sidebar:
     lang_selector()
-
-    # Plot style selector
-    from tools.plot_engine import plot_style_selector
-    engine = plot_style_selector()
     st.divider()
-
     st.image("https://img.icons8.com/color/96/test-tube--v1.png", width=50)
     st.markdown(f"## 🧬 {t('app_title')}")
 
@@ -183,14 +656,19 @@ with st.sidebar:
 
     _nm_keys = ['NIST .L Folder (Recommended)', 'JCAMP/MSP Files']
     _nm_labels = [t('sidebar_nist_l_opt'), t('sidebar_nist_jcamp_opt')]
+    saved_nist_mode = saved_cfg.get('nist_mode', 'NIST .L Folder (Recommended)')
     nist_mode_idx = st.radio(
         t('sidebar_nist_format'),
         range(len(_nm_keys)),
         format_func=lambda i: _nm_labels[i],
-        index=0,
+        index=_nm_keys.index(saved_nist_mode) if saved_nist_mode in _nm_keys else 0,
+        key="nist_mode_radio",
         help=".L Folder = your NIST17.L directory. JCAMP = pre-exported spectra files."
     )
     nist_mode = _nm_keys[nist_mode_idx]
+    # Persist nist_mode selection
+    if nist_mode != saved_nist_mode:
+        save_config({**saved_cfg, 'nist_mode': nist_mode})
 
     if nist_mode == "NIST .L Folder (Recommended)":
         # Use session state to persist the path
@@ -282,12 +760,21 @@ with st.sidebar:
                     st.caption("No matches")
 
     else:
-        # JCAMP: two sub-options
-        jcamp_submode = st.radio("JCAMP source:", ["Exported JCAMP folder (with subdirs)", "Single JCAMP/MSP directory"],
+        # JCAMP: two sub-options — path is saved to config for persistence
+        saved_jcamp_submode = saved_cfg.get('nist_jcamp_submode', 'Exported JCAMP folder (with subdirs)')
+        saved_jcamp_path = saved_cfg.get('nist_jcamp_path', '')
+        jcamp_submodes = ["Exported JCAMP folder (with subdirs)", "Single JCAMP/MSP directory"]
+        jcamp_submode = st.radio("JCAMP source:", jcamp_submodes,
+                                 index=jcamp_submodes.index(saved_jcamp_submode) if saved_jcamp_submode in jcamp_submodes else 0,
+                                 key="jcamp_submode_radio",
                                  help="'Exported' = output from tools/nist_export. 'Single' = flat directory of .jdx/.msp files.")
+        # Save sub-mode selection
+        if jcamp_submode != saved_cfg.get('nist_jcamp_submode', ''):
+            save_config({**saved_cfg, 'nist_jcamp_submode': jcamp_submode})
 
         if jcamp_submode == "Exported JCAMP folder (with subdirs)":
-            jcamp_export_path = st.text_input("Exported JCAMP path", value="",
+            jcamp_export_path = st.text_input("Exported JCAMP path",
+                                               value=st.session_state.get('nist_jcamp_path', saved_jcamp_path),
                                                placeholder="C:\\Users\\...\\Desktop\\JCAMP_Export",
                                                help="The folder containing 00000/, 10000/, etc. subdirectories")
             if jcamp_export_path and st.button("Load NIST Spectra Index", use_container_width=True):
@@ -307,13 +794,23 @@ with st.sidebar:
                             st.session_state.nist_name_index[e['name'].lower()] = e
                         st.session_state.nist_loaded = True
                         st.success(f"Spectrum index: {n:,} spectra ready for matching + metadata search")
+                        # Persist JCAMP path to config
+                        save_config({
+                            **saved_cfg,
+                            'nist_jcamp_path': jcamp_export_path,
+                            'nist_jcamp_submode': jcamp_submode,
+                            'nist_mode': nist_mode,
+                            'nist_loaded': True,
+                            'language': get_lang(),
+                        })
                     except Exception as e:
                         st.error(f"Failed: {e}")
             if st.session_state.get('nist_spectra_loaded'):
                 st.caption(f"Spectra: {len(st.session_state.nist_spec_index.spectra):,} indexed")
         else:
             st.caption("Point to your licensed NIST JCAMP/MSP files. Spectra stay on your machine.")
-            nist_path = st.text_input("NIST library path", value="", placeholder="D:\\NIST_JCAMP",
+            nist_path = st.text_input("NIST library path", value=saved_jcamp_path,
+                                      placeholder="D:\\NIST_JCAMP",
                                       help="Directory containing .jdx/.msp files exported from NIST MS Search")
             if nist_path and st.button("Index NIST Library", use_container_width=True):
                 if st.session_state.agent:
@@ -323,6 +820,15 @@ with st.sidebar:
                             st.info(f"Found {r.get('total_files',0)} files")
                             r2 = json.loads(st.session_state.agent._load_nist_library())
                             st.success(f"Indexed {r2.get('nist_entries',0)} NIST spectra ({r2.get('with_ri',0)} with RI)")
+                            # Persist JCAMP path to config
+                            save_config({
+                                **saved_cfg,
+                                'nist_jcamp_path': nist_path,
+                                'nist_jcamp_submode': jcamp_submode,
+                                'nist_mode': nist_mode,
+                                'nist_loaded': True,
+                                'language': get_lang(),
+                            })
                         else:
                             st.warning(r['error'])
 
@@ -489,52 +995,66 @@ st.markdown(f'<p class="main-header">🧬 {t("app_title")}</p>', unsafe_allow_ht
 st.markdown(f'<p class="sub-header">{t("app_subtitle")}</p>', unsafe_allow_html=True)
 
 if not st.session_state.data_loaded:
-    # Hero section
+    # ── Modern Hero Section ──
     st.markdown(f"""
-    <div style="text-align:center; padding: 1rem 0 2rem 0;">
-        <h1 style="color:#1a5276; font-size:2.5rem; margin-bottom:0.5rem;">{t('welcome_title')}</h1>
-        <p style="color:#666; font-size:1.1rem;">{t('welcome_subtitle')}</p>
+    <div class="gcms-hero">
+        <div class="hero-badge">🧬 {'Open-Source · AI-Powered' if get_lang() == 'en' else '开源 · AI驱动'}</div>
+        <h1>{t('welcome_title')}</h1>
+        <p>{t('welcome_subtitle')}</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Feature cards
+    # ── Feature Cards ──
     c1, c2, c3, c4 = st.columns(4)
-    with c1:
+    features = [
+        ('🧬', t('feature1_title'), t('feature1_desc')),
+        ('🔍', t('feature2_title'), t('feature2_desc')),
+        ('👃', t('feature3_title'), t('feature3_desc')),
+        ('🤖', t('feature4_title'), t('feature4_desc')),
+    ]
+    for i, (col, (icon, title, desc)) in enumerate(zip([c1, c2, c3, c4], features)):
+        with col:
+            st.markdown(f"""
+            <div class="card" style="text-align:center;">
+                <span class="feature-icon">{icon}</span>
+                <h4>{title}</h4>
+                <p>{desc}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Quick Start Guide ──
+    steps = [
+        ('1', ('Set your DeepSeek API Key in the sidebar →', '在侧边栏设置 DeepSeek API 密钥 →')),
+        ('2', ('Load data: local path, upload ZIP, or try the demo below', '加载数据：输入路径、上传压缩包、或试用下方演示')),
+        ('3', ('Explore: filter peaks, generate charts, calculate OAV & ROVA', '探索分析：过滤峰、生成图表、计算 OAV 与 ROVA')),
+        ('4', ('Export: download publication-ready plots, Word tables, HTML reports', '导出：下载论文级图表、Word三线表、HTML报告')),
+    ]
+    st.markdown("#### 🚀 " + ('Quick Start', '快速开始')[get_lang() == 'zh'])
+    for num, (en_text, zh_text) in steps:
+        text = en_text if get_lang() == 'en' else zh_text
         st.markdown(f"""
-        <div class="card" style="text-align:center;">
-            <div class="feature-icon">🧬</div>
-            <h4>{t('feature1_title')}</h4>
-            <p style="font-size:0.85rem;color:#666;">{t('feature1_desc')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"""
-        <div class="card" style="text-align:center;">
-            <div class="feature-icon">🔍</div>
-            <h4>{t('feature2_title')}</h4>
-            <p style="font-size:0.85rem;color:#666;">{t('feature2_desc')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with c3:
-        st.markdown(f"""
-        <div class="card" style="text-align:center;">
-            <div class="feature-icon">👃</div>
-            <h4>{t('feature3_title')}</h4>
-            <p style="font-size:0.85rem;color:#666;">{t('feature3_desc')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with c4:
-        st.markdown(f"""
-        <div class="card" style="text-align:center;">
-            <div class="feature-icon">🤖</div>
-            <h4>{t('feature4_title')}</h4>
-            <p style="font-size:0.85rem;color:#666;">{t('feature4_desc')}</p>
+        <div class="step-card">
+            <div class="step-num">{num}</div>
+            <div style="font-size:0.9rem; color:var(--text-secondary); padding-top:4px;">{text}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.divider()
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # Demo button
+    # ── CTA Demo Section ──
+    st.markdown(f"""
+    <div class="hero-cta">
+        <h3 style="margin:0 0 0.5rem 0; font-weight:700; color:var(--text);">
+            ☕ {'Try It Now — No Data Required' if get_lang() == 'en' else '立即体验 — 无需准备数据'}
+        </h3>
+        <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1rem;">
+            {'Explore a pre-loaded coffee roasting flavor dataset with 20 compounds across 9 samples.' if get_lang() == 'en' else '探索预加载的咖啡烘焙风味数据集，包含 9 个样品、20 种化合物。'}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
     demo_col1, demo_col2, demo_col3 = st.columns([1, 2, 1])
     with demo_col2:
         if st.button(t('btn_try_demo'), type="primary", use_container_width=True):
@@ -549,19 +1069,16 @@ if not st.session_state.data_loaded:
                 st.session_state.groups = df['group'].unique().tolist()
             st.rerun()
 
-    st.markdown(f"""
-    <div style="text-align:center; color:#999; margin-top:0.5rem;">
-        <small>{t('demo_or_load')}</small>
-    </div>
-    """, unsafe_allow_html=True)
+    st.caption(t('demo_or_load'))
 
+    # ── Stats Bar ──
     st.divider()
     st.markdown(f"""
-    <div style="display:flex; justify-content:center; gap:2rem; text-align:center; color:#666; font-size:0.9rem;">
-        <div>{t('stat_tools')}</div>
-        <div>{t('stat_library')}</div>
-        <div>{t('stat_interface')}</div>
-        <div>{t('stat_license')}</div>
+    <div class="stat-bar">
+        <span>{t('stat_tools')}</span>
+        <span>{t('stat_library')}</span>
+        <span>{t('stat_interface')}</span>
+        <span>{t('stat_license')}</span>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
@@ -1069,5 +1586,9 @@ with tab_export:
 
 # ---- Footer ----
 st.divider()
-st.caption(f"GC-MS AI Analyzer v3.3.0 · {datetime.now().year} · Open Source MIT License")
-st.caption(f"Library: 29,452 spectra · RI: 2,167 · MoNA API: 1M+ · OAV/ROVA DB: 120+ compounds")
+st.markdown(f"""
+<div class="gcms-footer">
+    <strong>GC-MS AI Analyzer</strong> v3.3.0 · {datetime.now().year} · MIT Open Source<br>
+    <span style="font-size:0.75rem;">Library: 29,452 spectra · RI: 2,167 · MoNA API: 1M+ · OAV/ROVA DB: 120+ compounds</span>
+</div>
+""", unsafe_allow_html=True)

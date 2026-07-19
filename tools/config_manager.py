@@ -18,6 +18,8 @@ DEFAULTS = {
     'api_key': '',
     'nist_path': '',
     'nist_mode': 'NIST .L Folder (Recommended)',
+    'nist_jcamp_submode': 'Exported JCAMP folder (with subdirs)',
+    'nist_jcamp_path': '',
     'nist_loaded': False,
     'data_dir': '',
     'language': 'en',

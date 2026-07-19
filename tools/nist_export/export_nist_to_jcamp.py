@@ -33,8 +33,8 @@ from System.IO import Directory, File, Path
 # ======================================================================
 #  CONFIGURATION - Edit these paths for your system
 # ======================================================================
-LIBRARY_PATH = r"C:\Users\86150\Desktop\NIST17.L"    # Your NIST .L folder
-OUTPUT_DIR   = r"C:\Users\86150\Desktop\JCAMP_Export" # Where JCAMP files go
+LIBRARY_PATH = r"<YOUR_NIST_L_FOLDER>"    # Your NIST .L folder (e.g. D:\NIST17.L)
+OUTPUT_DIR   = r"<YOUR_OUTPUT_FOLDER>"   # Where JCAMP files go (e.g. D:\JCAMP_Export)
 # ======================================================================
 
 START_INDEX = 0

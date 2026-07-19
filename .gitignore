@@ -73,3 +73,10 @@ deploy_package/
 .gcms_user_config.json
 dist_package/
 tools/nist_local.db
+*.zip
+*.exe
+*.msi
+.gemini/
+build/
+dist/
+*.spec.bak
