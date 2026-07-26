@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MASSFLOW — 分析工作台</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+/* ============================================================
+   MASSFLOW — Enterprise GC-MS Analysis Workbench
+   Design System: Midnight Blue · Graphite · Ice Accent
+   ============================================================ */
+:root {
+  --bg-root: #0c1119;
+  --bg-sidebar: #080d14;
+  --bg-panel: #131a25;
+  --bg-card: #18202e;
+  --bg-input: #1a2332;
+  --border-subtle: rgba(255,255,255,0.05);
+  --border-panel: rgba(255,255,255,0.07);
+  --border-accent: rgba(125,211,252,0.12);
+  --text-primary: #e8ecf1;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-ice: #7dd3fc;
+  --accent-ice-dim: #38bdf8;
+  --accent-teal: #4adeb0;
+  --accent-teal-dim: #2ea882;
+  --accent-amber: #fbbf24;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --font-ui: "Inter", "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", "Consolas", monospace;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-ui);
+  background: var(--bg-root);
+  color: var(--text-primary);
+  display: grid;
+  grid-template-columns: 220px 1fr 320px;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "sidebar main right"
+    "sidebar bottom right";
+  height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+/* ============================================================
+   LEFT SIDEBAR
+   ============================================================ */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column;
+  padding: 28px 0 20px 0;
+}
+.sidebar-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 22px; margin-bottom: 36px;
+}
+.sidebar-brand .logo-icon {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sidebar-brand .logo-icon svg { width: 28px; height: 28px; }
+.sidebar-brand .logo-text {
+  font-size: 1.05rem; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+.sidebar-nav { flex: 1; padding: 0 12px; }
+.sidebar-nav .nav-section {
+  font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-muted);
+  padding: 0 10px; margin: 18px 0 8px 0;
+}
+.sidebar-nav .nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  font-size: 0.84rem; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.15s ease; margin-bottom: 2px;
+  letter-spacing: 0.02em;
+}
+.sidebar-nav .nav-item:hover { background: rgba(255,255,255,0.03); color: var(--text-primary); }
+.sidebar-nav .nav-item.active {
+  background: rgba(125,211,252,0.08);
+  color: var(--accent-ice);
+  border-left: 2px solid var(--accent-ice);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.nav-item .nav-icon { width: 18px; text-align: center; font-size: 0.85rem; opacity: 0.7; }
+.nav-item.active .nav-icon { opacity: 1; }
+.sidebar-footer {
+  padding: 0 16px; border-top: 1px solid var(--border-subtle);
+  margin-top: auto; padding-top: 16px;
+}
+.sidebar-footer .user-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.8rem; color: var(--text-secondary);
+}
+.user-row .avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a5f, #2d5a87);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 600; color: var(--accent-ice);
+}
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+.main {
+  grid-area: main;
+  display: flex; flex-direction: column;
+  padding: 24px 28px 0 28px; overflow-y: auto;
+  background:
+    radial-gradient(ellipse at 60% 20%, rgba(56,189,248,0.03) 0%, transparent 60%),
+    var(--bg-root);
+}
+.main-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.main-header h1 {
+  font-size: 1.4rem; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+.main-header .date-badge {
+  font-size: 0.75rem; color: var(--text-muted);
+  background: var(--bg-card); border: 1px solid var(--border-panel);
+  padding: 5px 14px; border-radius: 100px;
+  letter-spacing: 0.03em;
+}
+/* KPI Cards Row */
+.kpi-row {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px; margin-bottom: 18px;
+}
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.kpi-card:hover { border-color: var(--border-accent); }
+.kpi-card::after {
+  content: '';
+  position: absolute; top: 0; right: 0; width: 80px; height: 80px;
+  background: radial-gradient(circle at top right, rgba(125,211,252,0.04), transparent);
+  pointer-events: none;
+}
+.kpi-card .kpi-label {
+  font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+}
+.kpi-card .kpi-value {
+  font-size: 2rem; font-weight: 700; letter-spacing: -0.01em;
+  font-family: var(--font-mono); line-height: 1;
+}
+.kpi-card .kpi-sub {
+  font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;
+}
+.kpi-value.accent-ice { color: var(--accent-ice); }
+.kpi-value.accent-teal { color: var(--accent-teal); }
+.kpi-value.accent-amber { color: var(--accent-amber); }
+.kpi-indicator {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 6px;
+}
+.kpi-indicator.up { background: var(--accent-teal); }
+.kpi-indicator.stable { background: var(--accent-ice); }
+/* Chart Panel */
+.chart-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-lg);
+  padding: 20px 20px 8px 20px;
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.chart-panel .chart-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.chart-panel .chart-title {
+  font-size: 0.9rem; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+.chart-panel .chart-legend {
+  display: flex; gap: 16px; font-size: 0.7rem; color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+.chart-legend span { display: flex; align-items: center; gap: 5px; }
+.chart-legend .dot {
+  width: 8px; height: 8px; border-radius: 2px;
+}
+.chart-legend .dot.signal { background: var(--accent-ice); }
+.chart-legend .dot.active { background: var(--accent-teal); }
+#chromatogram {
+  flex: 1; min-height: 0;
+}
+/* ============================================================
+   BOTTOM PANEL — Process Flow + Reports
+   ============================================================ */
+.bottom {
+  grid-area: bottom;
+  display: grid; grid-template-columns: 1fr 300px;
+  gap: 14px;
+  padding: 14px 28px 20px 28px;
+  background: var(--bg-root);
+  border-top: 1px solid var(--border-subtle);
+}
+.process-flow {
+  display: flex; gap: 0; align-items: stretch;
+}
+.process-step {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+.process-step:hover { border-color: var(--border-accent); }
+.process-step .step-num {
+  font-size: 0.66rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;
+}
+.process-step .step-title {
+  font-size: 0.88rem; font-weight: 600; letter-spacing: 0.03em;
+  color: var(--text-primary); margin-bottom: 3px;
+}
+.process-step .step-desc {
+  font-size: 0.7rem; color: var(--text-muted); line-height: 1.4;
+}
+.process-step .step-icon {
+  position: absolute; top: 14px; right: 16px;
+  font-size: 1.1rem; opacity: 0.5;
+}
+.process-arrow {
+  display: flex; align-items: center; padding: 0 8px;
+  color: var(--text-muted); font-size: 0.8rem; flex-shrink: 0;
+}
+/* Recent Reports */
+.recent-reports {
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  display: flex; flex-direction: column;
+}
+.recent-reports h3 {
+  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px;
+}
+.report-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.78rem;
+}
+.report-item:last-child { border-bottom: none; }
+.report-name { color: var(--text-primary); letter-spacing: 0.02em; }
+.report-date { color: var(--text-muted); font-size: 0.7rem; }
+.report-status {
+  font-size: 0.66rem; padding: 2px 8px; border-radius: 100px;
+  font-weight: 500; letter-spacing: 0.04em;
+}
+.report-status.done { background: rgba(74,222,176,0.1); color: var(--accent-teal); }
+.report-status.proc { background: rgba(125,211,252,0.08); color: var(--accent-ice); }
+/* ============================================================
+   RIGHT PANEL — Batch Queue
+   ============================================================ */
+.right-panel {
+  grid-area: right;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-subtle);
+  padding: 24px 18px; overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.right-panel h2 {
+  font-size: 0.85rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-secondary); margin-bottom: 18px;
+}
+.batch-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-md);
+  padding: 14px 16px; margin-bottom: 10px;
+  transition: border-color 0.15s ease;
+}
+.batch-item:hover { border-color: var(--border-accent); }
+.batch-item .batch-name {
+  font-size: 0.82rem; font-weight: 600; letter-spacing: 0.03em;
+  color: var(--text-primary); margin-bottom: 4px;
+}
+.batch-item .batch-meta {
+  font-size: 0.7rem; color: var(--text-muted);
+  display: flex; gap: 14px; margin-bottom: 8px;
+}
+.batch-progress {
+  height: 3px; background: rgba(255,255,255,0.06);
+  border-radius: 2px; overflow: hidden; margin-bottom: 6px;
+}
+.batch-progress .fill {
+  height: 100%; border-radius: 2px; transition: width 0.6s ease;
+}
+.batch-progress .fill.running { background: var(--accent-ice); }
+.batch-progress .fill.done { background: var(--accent-teal); }
+.batch-progress .fill.queued { background: var(--text-muted); }
+.batch-status {
+  font-size: 0.66rem; font-weight: 500; letter-spacing: 0.04em;
+}
+.batch-status .dot {
+  width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 5px;
+}
+.batch-status .dot.running { background: var(--accent-ice); animation: pulse 1.5s infinite; }
+.batch-status .dot.done { background: var(--accent-teal); }
+.batch-status .dot.queued { background: var(--text-muted); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.1); }
+</style>
+</head>
+<body>
+
+<!-- ========== LEFT SIDEBAR ========== -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo-icon">
+      <svg viewBox="0 0 28 28" fill="none">
+        <circle cx="8" cy="8" r="3.5" stroke="#7dd3fc" stroke-width="1.5" opacity="0.8"/>
+        <circle cx="20" cy="8" r="3.5" stroke="#7dd3fc" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="14" cy="16" r="3.5" stroke="#7dd3fc" stroke-width="1.5" opacity="0.9"/>
+        <circle cx="10" cy="22" r="2.5" stroke="#4adeb0" stroke-width="1.2" opacity="0.7"/>
+        <circle cx="18" cy="22" r="2.5" stroke="#4adeb0" stroke-width="1.2" opacity="0.5"/>
+        <line x1="8" y1="11.5" x2="14" y2="12.5" stroke="#7dd3fc" stroke-width="0.8" opacity="0.4"/>
+        <line x1="20" y1="11.5" x2="14" y2="12.5" stroke="#7dd3fc" stroke-width="0.8" opacity="0.4"/>
+        <line x1="14" y1="19.5" x2="10" y2="19.5" stroke="#4adeb0" stroke-width="0.8" opacity="0.4"/>
+        <line x1="14" y1="19.5" x2="18" y2="19.5" stroke="#4adeb0" stroke-width="0.8" opacity="0.4"/>
+      </svg>
+    </div>
+    <span class="logo-text">MASSFLOW</span>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">核心功能</div>
+    <div class="nav-item active"><span class="nav-icon">⊡</span> 分析工作台</div>
+    <div class="nav-item"><span class="nav-icon">⊞</span> 数据管理</div>
+    <div class="nav-item"><span class="nav-icon">◫</span> 谱库检索</div>
+    <div class="nav-item"><span class="nav-icon">◎</span> 统计分析</div>
+    <div class="nav-section">工具</div>
+    <div class="nav-item"><span class="nav-icon">⟐</span> 报告生成</div>
+    <div class="nav-item"><span class="nav-icon">⚙</span> 系统设置</div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-row">
+      <div class="avatar">L</div>
+      <div>
+        <div style="font-weight:500;font-size:0.8rem;">Lab Admin</div>
+        <div style="font-size:0.65rem;color:var(--text-muted);">GC-MS Unit 3</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ========== MAIN AREA ========== -->
+<main class="main">
+  <div class="main-header">
+    <h1>分析工作台</h1>
+    <div class="date-badge">2026-07-22 &nbsp;·&nbsp; 系统运行中</div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">本周已处理样本</div>
+      <div class="kpi-value accent-ice">1,248</div>
+      <div class="kpi-sub"><span class="kpi-indicator up"></span>较上周 +12.4%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">特征峰提取率</div>
+      <div class="kpi-value accent-teal">96.8<span style="font-size:1.2rem">%</span></div>
+      <div class="kpi-sub"><span class="kpi-indicator stable"></span>高于质控阈值 95%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">待审核结果</div>
+      <div class="kpi-value accent-amber">08</div>
+      <div class="kpi-sub">2 项 AI 标注已完成 · 待确认</div>
+    </div>
+  </div>
+
+  <!-- Chromatogram -->
+  <div class="chart-panel">
+    <div class="chart-header">
+      <span class="chart-title">实时色谱图</span>
+      <div class="chart-legend">
+        <span><span class="dot signal"></span> TIC 信号</span>
+        <span><span class="dot active"></span> 已识别峰</span>
+      </div>
+    </div>
+    <div id="chromatogram"></div>
+  </div>
+</main>
+
+<!-- ========== BOTTOM PANEL ========== -->
+<div class="bottom">
+  <div class="process-flow">
+    <div class="process-step">
+      <span class="step-icon" style="opacity:0.5;">⇩</span>
+      <div class="step-num">STEP 01</div>
+      <div class="step-title">格式解析</div>
+      <div class="step-desc">ChemStation .D<br>JCAMP · mzXML · CSV</div>
+    </div>
+    <div class="process-arrow">→</div>
+    <div class="process-step">
+      <span class="step-icon" style="opacity:0.6;">◮</span>
+      <div class="step-num">STEP 02</div>
+      <div class="step-title">峰提取</div>
+      <div class="step-desc">CWT 小波检测<br>去卷积 · 积分</div>
+    </div>
+    <div class="process-arrow">→</div>
+    <div class="process-step">
+      <span class="step-icon" style="opacity:0.7;">⟐</span>
+      <div class="step-num">STEP 03</div>
+      <div class="step-title">AI 注释</div>
+      <div class="step-desc">NIST · MoNA 匹配<br>风味通路标记</div>
+    </div>
+    <div class="process-arrow">→</div>
+    <div class="process-step">
+      <span class="step-icon" style="opacity:0.8;">⬡</span>
+      <div class="step-num">STEP 04</div>
+      <div class="step-title">统计做图</div>
+      <div class="step-desc">PCA · PLS-DA<br>火山图 · 热图</div>
+    </div>
+  </div>
+
+  <!-- Recent Reports -->
+  <div class="recent-reports">
+    <h3>最近报告</h3>
+    <div class="report-item">
+      <div>
+        <div class="report-name">烘焙咖啡_风味分析_v3</div>
+        <div class="report-date">2026-07-22 14:30</div>
+      </div>
+      <span class="report-status done">已完成</span>
+    </div>
+    <div class="report-item">
+      <div>
+        <div class="report-name">绿茶样品_批次对比_B2</div>
+        <div class="report-date">2026-07-22 10:15</div>
+      </div>
+      <span class="report-status done">已完成</span>
+    </div>
+    <div class="report-item">
+      <div>
+        <div class="report-name">香精香料_QC_2026Q3</div>
+        <div class="report-date">2026-07-21 16:48</div>
+      </div>
+      <span class="report-status proc">处理中</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== RIGHT PANEL ========== -->
+<aside class="right-panel">
+  <h2>批次队列</h2>
+
+  <div class="batch-item">
+    <div class="batch-name">绿茶风味对比 · 第3批</div>
+    <div class="batch-meta">
+      <span>24 样本</span><span>GC-MS QQQ</span>
+    </div>
+    <div class="batch-progress"><div class="fill running" style="width:78%"></div></div>
+    <div class="batch-status"><span class="dot running"></span>分析中 · 78%</div>
+  </div>
+
+  <div class="batch-item">
+    <div class="batch-name">咖啡烘焙度梯度实验</div>
+    <div class="batch-meta">
+      <span>36 样本</span><span>GC-MS SQ</span>
+    </div>
+    <div class="batch-progress"><div class="fill running" style="width:42%"></div></div>
+    <div class="batch-status"><span class="dot running"></span>分析中 · 42%</div>
+  </div>
+
+  <div class="batch-item">
+    <div class="batch-name">香精稳定性 · 加速试验</div>
+    <div class="batch-meta">
+      <span>18 样本</span><span>GC-MS QQQ</span>
+    </div>
+    <div class="batch-progress"><div class="fill done" style="width:100%"></div></div>
+    <div class="batch-status"><span class="dot done"></span>已完成 · 100%</div>
+  </div>
+
+  <div class="batch-item">
+    <div class="batch-name">白酒挥发性成分谱库</div>
+    <div class="batch-meta">
+      <span>12 样本</span><span>GC-MS SQ</span>
+    </div>
+    <div class="batch-progress"><div class="fill queued" style="width:0%"></div></div>
+    <div class="batch-status"><span class="dot queued"></span>排队等待</div>
+  </div>
+
+  <div class="batch-item">
+    <div class="batch-name">环境VOC · 方法验证</div>
+    <div class="batch-meta">
+      <span>08 样本</span><span>GC-MS SQ</span>
+    </div>
+    <div class="batch-progress"><div class="fill queued" style="width:0%"></div></div>
+    <div class="batch-status"><span class="dot queued"></span>排队等待</div>
+  </div>
+</aside>
+
+<!-- ============================================================
+   CHROMATOGRAM — Plotly.js
+   ============================================================ -->
+<script>
+(function() {
+  const container = document.getElementById('chromatogram');
+
+  // Generate realistic GC chromatogram data (simulated)
+  const N = 2800;
+  const t = [];
+  const signal = [];
+
+  // Build a realistic baseline with noise
+  for (let i = 0; i < N; i++) {
+    const time = 2.0 + (i / N) * 28.0;
+    t.push(time);
+    // Slightly rising baseline with 1/f-like noise
+    const base = 0.08 + time * 0.003;
+    const noise = (Math.random() - 0.5) * 0.025
+      + Math.sin(time * 0.7) * 0.015
+      + Math.sin(time * 1.3) * 0.01;
+    signal.push(Math.max(0.005, base + noise));
+  }
+
+  // Gaussian peak function
+  function gaussian(x, rt, height, width) {
+    const w = width || 0.06 + Math.random() * 0.04;
+    return height * Math.exp(-0.5 * Math.pow((x - rt) / w, 2));
+  }
+
+  // Define realistic peaks (retention time in minutes)
+  const peaks = [
+    { rt: 3.82,  h: 0.32, w: 0.04, name: '乙醇' },
+    { rt: 4.55,  h: 0.18, w: 0.03, name: '乙酸乙酯' },
+    { rt: 5.31,  h: 0.26, w: 0.04, name: '2-甲基丁醛' },
+    { rt: 6.18,  h: 0.44, w: 0.04, name: '3-甲基丁醛' },
+    { rt: 7.42,  h: 0.35, w: 0.05, name: '己醛' },
+    { rt: 8.75,  h: 0.28, w: 0.04, name: '2-庚酮' },
+    { rt: 9.60,  h: 0.52, w: 0.04, name: '庚醛' },
+    { rt: 10.83, h: 0.38, w: 0.05, name: '1-辛烯-3-醇' },
+    { rt: 11.95, h: 0.31, w: 0.04, name: '苯甲醛' },
+    { rt: 13.30, h: 0.46, w: 0.04, name: '辛醛' },
+    { rt: 14.55, h: 0.29, w: 0.04, name: '苯乙醛' },
+    { rt: 15.80, h: 0.41, w: 0.04, name: '壬醛' },
+    { rt: 17.15, h: 0.34, w: 0.04, name: '芳樟醇' },
+    // === MAIN PEAK (highlighted) ===
+    { rt: 19.20, h: 1.00, w: 0.06, name: '2,5-二甲基吡嗪' },
+    { rt: 20.45, h: 0.33, w: 0.04, name: 'α-松油醇' },
+    { rt: 22.10, h: 0.27, w: 0.04, name: '香叶醇' },
+    { rt: 23.70, h: 0.22, w: 0.04, name: 'β-紫罗兰酮' },
+    { rt: 25.30, h: 0.19, w: 0.04, name: '丁香酚' },
+    { rt: 26.80, h: 0.15, w: 0.04, name: '香兰素' },
+    { rt: 28.20, h: 0.12, w: 0.04, name: '咖啡因' },
+  ];
+
+  // Add peaks to signal
+  const peakMarkerX = [];
+  const peakMarkerY = [];
+  const peakLabels = [];
+  for (const p of peaks) {
+    for (let i = 0; i < N; i++) {
+      signal[i] += gaussian(t[i], p.rt, p.h, p.w);
+    }
+    // Mark peak top
+    const idx = t.findIndex(v => v >= p.rt);
+    if (idx >= 0) {
+      peakMarkerX.push(p.rt);
+      peakMarkerY.push(signal[idx] + 0.04);
+      peakLabels.push(p.name);
+    }
+  }
+
+  // TIC trace (low opacity background signal)
+  const traceTIC = {
+    x: t,
+    y: signal,
+    type: 'scatter',
+    mode: 'lines',
+    name: 'TIC',
+    line: {
+      color: 'rgba(125,211,252,0.45)',
+      width: 1.0,
+    },
+    fill: 'tozeroy',
+    fillcolor: 'rgba(56,189,248,0.04)',
+    hoverinfo: 'skip',
+  };
+
+  // Peak markers
+  const tracePeaks = {
+    x: peakMarkerX,
+    y: peakMarkerY,
+    type: 'scatter',
+    mode: 'markers+text',
+    name: '已识别峰',
+    marker: {
+      color: peakMarkerY.map((y, i) =>
+        i === 13 ? '#4adeb0' : 'rgba(74,222,176,0.5)'
+      ),
+      size: peakMarkerY.map((y, i) => i === 13 ? 12 : 6),
+      symbol: 'diamond',
+      line: { width: 0 },
+    },
+    text: peakLabels,
+    textposition: 'top center',
+    textfont: {
+      family: '"PingFang SC","Microsoft YaHei",sans-serif',
+      size: 9,
+      color: peakMarkerY.map((y, i) =>
+        i === 13 ? '#4adeb0' : 'rgba(148,163,184,0.7)'
+      ),
+    },
+    hoverinfo: 'text',
+    hoverlabel: {
+      bgcolor: '#18202e',
+      bordercolor: 'rgba(125,211,252,0.2)',
+      font: { color: '#e8ecf1', size: 11, family: '"PingFang SC","Microsoft YaHei",sans-serif' },
+    },
+  };
+
+  // Highlight zone for main peak
+  const mainPeak = peaks[13];
+  const zoneX = [];
+  const zoneY = [];
+  for (let i = 0; i < N; i++) {
+    if (t[i] >= mainPeak.rt - 0.22 && t[i] <= mainPeak.rt + 0.22) {
+      zoneX.push(t[i]);
+      zoneY.push(signal[i]);
+    }
+  }
+  const traceZone = {
+    x: zoneX,
+    y: zoneY,
+    type: 'scatter',
+    mode: 'lines',
+    name: '主峰区域',
+    line: { color: 'rgba(74,222,176,0.6)', width: 1.5 },
+    fill: 'tozeroy',
+    fillcolor: 'rgba(74,222,176,0.06)',
+    hoverinfo: 'skip',
+  };
+
+  const layout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    margin: { l: 44, r: 24, t: 12, b: 32 },
+    xaxis: {
+      title: { text: '保留时间 (min)', font: { size: 10, color: '#64748b', family: '"PingFang SC","Microsoft YaHei",sans-serif' } },
+      color: '#64748b',
+      gridcolor: 'rgba(255,255,255,0.03)',
+      zeroline: false,
+      tickfont: { size: 9, color: '#64748b' },
+      range: [2, 30],
+      dtick: 4,
+    },
+    yaxis: {
+      title: { text: '相对丰度', font: { size: 10, color: '#64748b', family: '"PingFang SC","Microsoft YaHei",sans-serif' } },
+      color: '#64748b',
+      gridcolor: 'rgba(255,255,255,0.03)',
+      zeroline: false,
+      tickfont: { size: 9, color: '#64748b' },
+      tickformat: '.1f',
+    },
+    showlegend: false,
+    dragmode: 'pan',
+    hovermode: 'closest',
+  };
+
+  const config = {
+    displayModeBar: true,
+    modeBarButtonsToRemove: [
+      'zoom2d', 'pan2d', 'select2d', 'lasso2d',
+      'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d',
+      'toggleSpikelines', 'hoverClosestCartesian', 'hoverCompareCartesian',
+    ],
+    modeBarButtonsToAdd: [],
+    displaylogo: false,
+    responsive: true,
+  };
+
+  Plotly.newPlot(container, [traceTIC, traceZone, tracePeaks], layout, config);
+})();
+</script>
+</body>
+</html>

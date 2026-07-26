@@ -16,10 +16,22 @@ output/
 Thumbs.db
 .DS_Store
 
-# Sensitive
+# Sensitive — API keys, NIST data, user data
 *.key
 *.token
 .env
+.gcms_user_config.json
+.gcms_session.pkl
+tools/nist_local.db
+
+# User experiment data directories
+*.D/
+data/
+JCAMP_Export/
+JCAMP*/
+
+# Downloaded spectral data caches (regeneratable from public APIs)
+gnps-page.TXT
 
 # Temp/test scripts
 _*.py
@@ -71,6 +83,7 @@ exporter_settings.json
 tools/nist_exporter/__pycache__/
 deploy_package/
 .gcms_user_config.json
+.gcms_session.pkl
 dist_package/
 tools/nist_local.db
 *.zip

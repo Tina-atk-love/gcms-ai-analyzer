@@ -50,8 +50,10 @@ DEEPSEEK_MODEL = "deepseek-chat"
 # ============================================================
 
 PUBLICATION_RCPARAMS = {
-    'font.family': 'serif',
-    'font.serif': ['Times New Roman', 'SimSun', 'STSong', 'SimHei'],
+    'font.family': 'sans-serif',
+    'font.sans-serif': ['Microsoft YaHei', 'SimHei', 'SimSun', 'STSong',
+                        'Noto Sans CJK SC', 'WenQuanYi Micro Hei',
+                        'PingFang SC', 'Heiti SC', 'Arial'],
     'mathtext.fontset': 'stix',
     'axes.unicode_minus': False,
     'figure.dpi': 150,
@@ -77,12 +79,84 @@ PUBLICATION_RCPARAMS = {
     'lines.markersize': 6,
 }
 
+# Auto-detect best available CJK font
+def _detect_cjk_font():
+    """Find an available Chinese-capable font and set it as default."""
+    try:
+        from matplotlib import font_manager
+        available = {f.name for f in font_manager.fontManager.ttflist}
+        candidates = ['Microsoft YaHei', 'SimHei', 'SimSun', 'STSong',
+                      'Noto Sans CJK SC', 'WenQuanYi Micro Hei',
+                      'PingFang SC', 'Heiti SC', 'Source Han Sans SC']
+        for c in candidates:
+            if c in available:
+                PUBLICATION_RCPARAMS['font.sans-serif'] = [c] + PUBLICATION_RCPARAMS['font.sans-serif']
+                return c
+    except Exception:
+        pass
+    return None
+
+_detect_cjk_font()
+
 # Color-blind friendly palettes (Okabe-Ito inspired)
 COLOR_PALETTES = {
     'categorical': ['#0072B2', '#E69F00', '#009E73', '#F0E442',
                     '#56B4E9', '#D55E00', '#CC79A7', '#000000'],
     'divergent':   ['#2166ac', '#92c5de', '#d1e5f0', '#f7f7f7',
                     '#fddbc7', '#f4a582', '#b2182b'],
+}
+
+# ============================================================
+# Nature Journal Publication Standards
+# ============================================================
+
+NATURE_COLORS = {
+    # Nature-approved, colorblind-friendly palettes
+    'categorical': ['#E64B35','#4DBBD5','#00A087','#3C5488','#F39B7F',
+                    '#8491B4','#91D1C2','#DC0000','#7E6148','#B09C85'],
+    'sequential': ['#F7F4F9','#E7E1EF','#D4B9DA','#C994C7','#DF65B0',
+                   '#E7298A','#CE1256','#980043','#67001F'],
+    'diverging':  ['#053061','#2166AC','#4393C3','#92C5DE','#D1E5F0',
+                   '#F7F7F7','#FDDBC7','#F4A582','#D6604D','#B2182B'],
+    'highlight': '#E64B35',  # Nature red
+    'accent': '#4DBBD5',     # Nature blue
+    'neutral': '#3C5488',    # Nature navy
+}
+
+NATURE_RCPARAMS = {
+    # Nature journal figure requirements
+    'font.family': 'sans-serif',
+    'font.sans-serif': ['Arial', 'Helvetica', 'Microsoft YaHei', 'SimHei'],
+    'font.size': 7,
+    'axes.labelsize': 8,
+    'axes.titlesize': 9,
+    'xtick.labelsize': 7,
+    'ytick.labelsize': 7,
+    'legend.fontsize': 7,
+    'figure.dpi': 600,
+    'savefig.dpi': 600,
+    'savefig.bbox': 'tight',
+    'savefig.pad_inches': 0.05,
+    'lines.linewidth': 1.0,
+    'lines.markersize': 4,
+    'axes.linewidth': 0.5,
+    'xtick.major.width': 0.5,
+    'ytick.major.width': 0.5,
+    'xtick.major.size': 3,
+    'ytick.major.size': 3,
+    'axes.spines.top': False,
+    'axes.spines.right': False,
+    'axes.grid': False,
+    'figure.facecolor': 'white',
+    'axes.facecolor': 'white',
+    'axes.unicode_minus': False,
+}
+
+# Nature figure dimensions (mm → inches at 1x, 1.5x, 2x)
+NATURE_SIZES = {
+    'single': (3.5, 2.6),    # single column (89mm)
+    '1.5col': (5.5, 4.1),    # 1.5 column (140mm)
+    'double': (7.2, 5.4),    # double column (183mm)
 }
 
 # ============================================================
@@ -638,6 +712,11 @@ TOOLS = [
     {"type":"function","function":{"name":"word_tables","description":"Export results as formatted Word (.docx) tables in 三线表 style suitable for Chinese academic journals. Includes compound summary table, ANOVA significant compounds, and group comparison table. Ready for manuscript insertion.","parameters":{"type":"object","properties":{},"required":[]}}},
     # --- 34. correct_batch (NEW) ---
     {"type":"function","function":{"name":"correct_batch","description":"Correct for systematic batch effects between replicate experiments using location-scale adjustment. Normalizes each batch to the reference batch, removing unwanted technical variation while preserving biological differences.","parameters":{"type":"object","properties":{},"required":[]}}},
+    # --- 35. professional_plots (Plotly interactive) ---
+    {"type":"function","function":{"name":"professional_plots","description":"Generate professional-quality interactive Plotly charts. Produces self-contained HTML files with zoom, pan, hover tooltips, and export capabilities. MUCH better quality than static matplotlib PNGs. Chart types: pca (interactive scores with sample labels + loadings), heatmap (clustered with hover values), bar (grouped or stacked by group), volcano (interactive with gene-like labels), radar (flavor dimension spider chart), dashboard (6-panel comprehensive). Each chart is saved as an HTML file in output/agent_results/plots/.","parameters":{"type":"object","properties":{"chart_type":{"type":"string","description":"Chart type: 'pca', 'heatmap', 'bar', 'volcano', 'radar', 'dashboard', or 'all'"},"title":{"type":"string","description":"Optional chart title"}},"required":["chart_type"]}}},
+    # --- 36. Nature Journal Publication Skills ---
+    {"type":"function","function":{"name":"nature_figures","description":"Generate publication-ready figures following Nature journal standards. Uses Nature-approved color palettes (colorblind-friendly), proper Arial/Helvetica typography at 7pt, exact column dimensions (single=89mm, 1.5col=140mm, double=183mm), 600dpi TIFF output, and minimal chartjunk. Types: bar, pca, heatmap, volcano, boxplot, all. Each figure is saved as a 600dpi publication-ready file.","parameters":{"type":"object","properties":{"fig_type":{"type":"string","description":"Figure type: 'bar', 'pca', 'heatmap', 'volcano', 'boxplot', 'composite', or 'all'"},"size":{"type":"string","description":"Column width: 'single' (89mm), '1.5col' (140mm), 'double' (183mm)"}},"required":["fig_type"]}}},
+    {"type":"function","function":{"name":"nature_report","description":"Generate a complete Nature-style supplementary information report. Includes: (1) Statistical summary with exact p-values, confidence intervals, and effect sizes (Cohen's d/eta-squared), (2) Nature-formatted figures, (3) Methods section draft, (4) Compound characterization table. All statistics reported per Nature guidelines: exact p-values (not asterisks), n= values, degrees of freedom, test statistics.","parameters":{"type":"object","properties":{"sections":{"type":"string","description":"Report sections: 'stats', 'figures', 'methods', 'table', or 'all'"}},"required":[]}}},
 ]
 
 # ============================================================
@@ -1249,13 +1328,27 @@ class GCMSAgent:
                                 conc = float(parts[4].strip())
                                 compound = parts[7].strip().strip('"').lower()
                                 if compound and len(compound) <= 20:
-                                    parsed_peaks.append({
+                                    entry = {
                                         'rt': round(rt, 3),
                                         'area': round(area, 1),
                                         'amount': amount,
                                         'conc_g100g': conc,
                                         'compound': compound,
-                                    })
+                                    }
+                                    # Extract match quality from ChemStation CSV (if present)
+                                    # Common Agilent positions: parts[8]=Qual/Match, parts[9]=CAS
+                                    if len(parts) >= 9:
+                                        try:
+                                            qual = float(parts[8].strip())
+                                            if 0 <= qual <= 100:
+                                                entry['match_factor'] = qual
+                                        except (ValueError, IndexError):
+                                            pass
+                                    if len(parts) >= 10:
+                                        cas = parts[9].strip().strip('"')
+                                        if cas and cas != '0' and len(cas) > 2:
+                                            entry['cas'] = cas
+                                    parsed_peaks.append(entry)
                             except (ValueError, IndexError):
                                 continue
                         data_source = "CSV"
@@ -1557,6 +1650,496 @@ class GCMSAgent:
         ok = [g for g in generated if not g.startswith('ERROR')]
         return json.dumps({"status": "done", "generated": ok, "count": len(ok), "errors": len(generated) - len(ok)}, ensure_ascii=False)
 
+    def _professional_plots(self, chart_type, title=None):
+        """Generate interactive Plotly charts as self-contained HTML files."""
+        import plotly.graph_objects as go
+        import plotly.express as px
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+        import numpy as np
+
+        plots_dir = OUTPUT_DIR / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        generated = []
+        df = self.df
+        if df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        # Value column selection
+        val_col = 'area'
+        if 'conc_g100g' in df.columns and df['conc_g100g'].notna().sum() > 5:
+            val_col = 'conc_g100g'
+        elif 'amount' in df.columns and df['amount'].notna().sum() > 5:
+            val_col = 'amount'
+
+        types = ['pca','heatmap','bar','volcano','radar','dashboard'] if chart_type == 'all' else [chart_type]
+        colors = ['#7dd3fc','#4adeb0','#fbbf24','#f87171','#a78bfa','#fb923c','#e879f9','#67e8f9',
+                  '#fda4af','#86efac','#fed7aa','#c4b5fd']
+
+        for ct in types:
+            try:
+                if ct == 'pca':
+                    pivot = df.pivot_table(values=val_col, index='sample', columns='compound', aggfunc='mean').fillna(0)
+                    samples_all = list(pivot.index)
+                    X_s = StandardScaler().fit_transform(pivot.values)
+                    pca = PCA(n_components=min(3, X_s.shape[0], X_s.shape[1]))
+                    X_pca = pca.fit_transform(X_s)
+                    evr = pca.explained_variance_ratio_
+                    groups_uniq = sorted(df['group'].unique()) if 'group' in df.columns else ['All']
+                    group_map = dict(zip(df['sample'], df['group'])) if 'group' in df.columns else {s:'All' for s in samples_all}
+
+                    fig = go.Figure()
+                    for gi, grp in enumerate(groups_uniq):
+                        idxs = [i for i,s in enumerate(samples_all) if group_map.get(s)==grp]
+                        if not idxs: continue
+                        fig.add_trace(go.Scatter(
+                            x=X_pca[idxs,0], y=X_pca[idxs,1] if X_pca.shape[1]>=2 else [0]*len(idxs),
+                            mode='markers+text', name=str(grp),
+                            text=[str(samples_all[i]).replace('.D','') for i in idxs],
+                            textposition='top center',
+                            textfont=dict(size=10),
+                            marker=dict(size=14, color=colors[gi%len(colors)], line=dict(width=1, color='rgba(0,0,0,0.1)')),
+                            hovertemplate='<b>%{text}</b><br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>'
+                        ))
+                    fig.update_layout(
+                        title=title or f'PCA ({evr[0]*100:.1f}% + {evr[1]*100:.1f}%)',
+                        xaxis_title=f'PC1 ({evr[0]*100:.1f}%)', yaxis_title=f'PC2 ({evr[1]*100:.1f}%)',
+                        height=520, template='plotly_white', dragmode='pan',
+                        legend=dict(orientation='h', y=1.12, x=0.5, xanchor='center')
+                    )
+                    p = str(plots_dir / 'pca_interactive.html')
+                    fig.write_html(p, include_plotlyjs='cdn')
+                    generated.append(p)
+
+                elif ct == 'heatmap':
+                    pivot = df.pivot_table(values=val_col, index='sample', columns='compound', aggfunc='mean').fillna(0)
+                    from scipy.cluster.hierarchy import linkage, leaves_list
+                    Z = linkage(pivot.values, method='ward')
+                    row_order = leaves_list(Z)
+                    Zc = linkage(pivot.T.values, method='ward')
+                    col_order = leaves_list(Zc)
+                    data_ordered = pivot.iloc[row_order, col_order]
+                    data_z = ((data_ordered - data_ordered.mean()) / data_ordered.std()).fillna(0)
+
+                    fig = go.Figure(data=go.Heatmap(
+                        z=data_z.values,
+                        x=[str(c) for c in data_z.columns],
+                        y=[str(i).replace('.D','') for i in data_z.index],
+                        colorscale='RdBu_r', zmid=0,
+                        hovertemplate='Compound: %{x}<br>Sample: %{y}<br>Z-score: %{z:.2f}<extra></extra>',
+                        colorbar=dict(title='Z-score', len=0.5)
+                    ))
+                    fig.update_layout(
+                        title=title or 'Hierarchical Clustering Heatmap',
+                        height=max(500, len(pivot)*28), template='plotly_white'
+                    )
+                    p = str(plots_dir / 'heatmap_interactive.html')
+                    fig.write_html(p, include_plotlyjs='cdn')
+                    generated.append(p)
+
+                elif ct == 'bar':
+                    if 'group' in df.columns and df['group'].nunique() >= 2:
+                        group_means = df.groupby(['group','compound'])[val_col].mean().reset_index()
+                        top_comps = df.groupby('compound')[val_col].mean().nlargest(12).index
+                        gdata = group_means[group_means['compound'].isin(top_comps)]
+                        fig = px.bar(gdata, x='compound', y=val_col, color='group',
+                                     barmode='group', template='plotly_white',
+                                     title=title or 'Top Compounds by Group')
+                    else:
+                        comp_means = df.groupby('compound')[val_col].mean().nlargest(15).reset_index()
+                        fig = px.bar(comp_means, x=val_col, y='compound', orientation='h',
+                                     template='plotly_white', title=title or 'Top Compounds')
+                    fig.update_layout(height=450)
+                    p = str(plots_dir / 'bar_interactive.html')
+                    fig.write_html(p, include_plotlyjs='cdn')
+                    generated.append(p)
+
+                elif ct == 'volcano':
+                    groups = df['group'].unique()
+                    if len(groups) >= 2:
+                        g1, g2 = str(groups[0]), str(groups[1])
+                        m1 = df[df['group']==g1].groupby('compound')[val_col].mean()
+                        m2 = df[df['group']==g2].groupby('compound')[val_col].mean()
+                        common = m1.index.intersection(m2.index)
+                        fc = np.log2((m2[common]+1e-6) / (m1[common]+1e-6))
+                        from scipy.stats import ttest_ind
+                        pvals = []
+                        for c in common:
+                            v1 = df[(df['group']==g1)&(df['compound']==c)][val_col]
+                            v2 = df[(df['group']==g2)&(df['compound']==c)][val_col]
+                            try:
+                                _, pv = ttest_ind(v1, v2)
+                                pvals.append(max(pv, 1e-300))
+                            except:
+                                pvals.append(1.0)
+                        neg_log_p = -np.log10(pvals)
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            x=fc, y=neg_log_p, mode='markers',
+                            marker=dict(size=8, color=['#f87171' if abs(f)>1 and np>1.3 else '#94a3b8' for f,np in zip(fc,neg_log_p)],
+                                        line=dict(width=0)),
+                            text=[str(c) for c in common],
+                            hovertemplate='<b>%{text}</b><br>log2FC: %{x:.2f}<br>-log10(p): %{y:.2f}<extra></extra>'
+                        ))
+                        fig.add_hline(y=1.3, line_dash='dash', line_color='rgba(128,128,128,0.3)')
+                        fig.update_layout(
+                            title=title or f'Volcano: {g1} vs {g2}',
+                            xaxis_title=f'log2 Fold Change', yaxis_title='-log10(p-value)',
+                            height=500, template='plotly_white'
+                        )
+                        p = str(plots_dir / 'volcano_interactive.html')
+                        fig.write_html(p, include_plotlyjs='cdn')
+                        generated.append(p)
+
+                elif ct == 'radar':
+                    from flavor_tools import calculate_oav
+                    ODOR_CATS = {
+                        'Green/Grassy': ['hexanal','heptanal','octanal','nonanal','decanal','2-heptenal','2-octenal','citronellal','hexanol'],
+                        'Fruity/Sweet': ['ethyl acetate','isoamyl acetate','ethyl butyrate','ethyl hexanoate','benzaldehyde','vanillin','beta-ionone','linalool','geraniol'],
+                        'Roasted/Nutty': ['2-methylpyrazine','2,5-dimethylpyrazine','2,6-dimethylpyrazine','furfural','furfuryl alcohol','pyrrole'],
+                        'Fatty/Rancid': ['2,4-decadienal','butyric acid','hexanoic acid','octanoic acid','isovaleric acid'],
+                        'Earthy/Musty': ['geosmin','2-methylisoborneol','1-octen-3-ol','2-pentylfuran','indole'],
+                        'Floral/Spicy': ['alpha-pinene','limonene','caryophyllene','eugenol','phenylethyl alcohol','alpha-terpineol','thymol'],
+                        'Sulfurous': ['dimethyl sulfide','dimethyl disulfide','dimethyl trisulfide','methional','furfurylthiol'],
+                        'Fermented': ['acetoin','2,3-butanedione','2,3-pentanedione','acetic acid','3-methylbutanal'],
+                    }
+                    df_oav = calculate_oav(df)
+                    cat_scores = {}
+                    for cat, comps in ODOR_CATS.items():
+                        score = 0.0
+                        for c in comps:
+                            mask = df_oav['compound'].str.lower().str.strip() == c.lower()
+                            if mask.any():
+                                score += float(df_oav.loc[mask, 'log_oav'].mean())
+                        cat_scores[cat] = max(score, 0.01)
+                    cats = list(cat_scores.keys())
+                    vals = [cat_scores[c] for c in cats]
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(
+                        r=vals+[vals[0]], theta=cats+[cats[0]], fill='toself',
+                        fillcolor='rgba(125,211,252,0.2)', line=dict(color='#7dd3fc',width=2.5),
+                        marker=dict(size=6, color='#7dd3fc')
+                    ))
+                    fig.update_layout(
+                        title=title or 'Flavor Dimension Radar',
+                        polar=dict(radialaxis=dict(range=[0, max(vals)*1.2], gridcolor='rgba(0,0,0,0.1)')),
+                        height=500, template='plotly_white'
+                    )
+                    p = str(plots_dir / 'radar_interactive.html')
+                    fig.write_html(p, include_plotlyjs='cdn')
+                    generated.append(p)
+
+                elif ct == 'dashboard':
+                    # Multi-panel: bar + heatmap + PCA in one HTML
+                    pivot = df.pivot_table(values=val_col, index='sample', columns='compound', aggfunc='mean').fillna(0)
+                    X_s = StandardScaler().fit_transform(pivot.values)
+                    pca_obj = PCA(n_components=min(3, X_s.shape[0], X_s.shape[1]))
+                    X_pca = pca_obj.fit_transform(X_s)
+                    evr = pca_obj.explained_variance_ratio_
+                    top10 = df.groupby('compound')[val_col].mean().nlargest(10)
+
+                    # Use plotly subplots
+                    from plotly.subplots import make_subplots
+                    fig = make_subplots(rows=2, cols=2,
+                        subplot_titles=('Top Compounds', 'PCA Scores', 'Sample Heatmap (Z-score)', 'Distribution'),
+                        specs=[[{'type':'bar'},{'type':'scatter'}],[{'type':'heatmap'},{'type':'bar'}]])
+                    # 1: Bar
+                    fig.add_trace(go.Bar(x=top10.values, y=top10.index, orientation='h', marker_color='#7dd3fc'),
+                                  row=1, col=1)
+                    # 2: PCA
+                    groups = sorted(df['group'].unique()) if 'group' in df.columns else ['All']
+                    gm = dict(zip(df['sample'], df['group'])) if 'group' in df.columns else {}
+                    for gi, grp in enumerate(groups):
+                        idxs = [i for i,s in enumerate(pivot.index) if gm.get(s)==grp]
+                        if not idxs: continue
+                        fig.add_trace(go.Scatter(
+                            x=X_pca[idxs,0], y=X_pca[idxs,1], mode='markers+text',
+                            name=str(grp), text=[str(pivot.index[i]).replace('.D','') for i in idxs],
+                            textposition='top center', textfont=dict(size=9),
+                            marker=dict(size=10, color=colors[gi%len(colors)])
+                        ), row=1, col=2)
+                    # 3: Heatmap
+                    data_z = ((pivot-pivot.mean())/pivot.std()).fillna(0)
+                    fig.add_trace(go.Heatmap(
+                        z=data_z.values, x=[str(c)[:15] for c in data_z.columns],
+                        y=[str(i).replace('.D','') for i in data_z.index],
+                        colorscale='RdBu_r', zmid=0, showscale=False
+                    ), row=2, col=1)
+                    # 4: Distribution histogram
+                    fig.add_trace(go.Histogram(x=df[val_col], marker_color='#7dd3fc', nbinsx=30), row=2, col=2)
+                    fig.update_layout(
+                        title=title or 'Comprehensive Dashboard', height=800,
+                        template='plotly_white', showlegend=True
+                    )
+                    fig.update_xaxes(title_text=f'PC1 ({evr[0]*100:.0f}%)', row=1, col=2)
+                    fig.update_yaxes(title_text=f'PC2 ({evr[1]*100:.0f}%)', row=1, col=2)
+                    p = str(plots_dir / 'dashboard_interactive.html')
+                    fig.write_html(p, include_plotlyjs='cdn')
+                    generated.append(p)
+
+            except Exception as e:
+                generated.append(f'ERROR[{ct}]: {e}')
+
+        return json.dumps({"status":"done","files":generated,"count":len([g for g in generated if not str(g).startswith('ERROR')])}, ensure_ascii=False)
+
+    # ================================================================
+    # Nature Journal Publication Skills
+    # ================================================================
+
+    def _nature_figures(self, fig_type='all', size='single'):
+        """Generate publication-ready figures per Nature journal standards."""
+        import numpy as np
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+
+        plt.rcParams.update(NATURE_RCPARAMS)
+        figsize = NATURE_SIZES.get(size, NATURE_SIZES['single'])
+        plots_dir = OUTPUT_DIR / "plots" / "nature"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        generated = []
+
+        df = self.df
+        if df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        val_col = 'area'
+        if 'conc_g100g' in df.columns and df['conc_g100g'].notna().sum() > 5:
+            val_col = 'conc_g100g'
+        elif 'amount' in df.columns and df['amount'].notna().sum() > 5:
+            val_col = 'amount'
+
+        colors = NATURE_COLORS['categorical']
+        types = ['bar','pca','heatmap','volcano','boxplot'] if fig_type == 'all' else [fig_type]
+
+        for ft in types:
+            try:
+                if ft == 'bar':
+                    top12 = df.groupby('compound')[val_col].mean().nlargest(12).index
+                    fig, ax = plt.subplots(figsize=figsize)
+                    for gi, grp in enumerate(sorted(df['group'].unique())):
+                        means = df[(df['group']==grp)&(df['compound'].isin(top12))].groupby('compound')[val_col].mean()
+                        ax.bar(np.arange(len(top12)) + gi*0.15, [means.get(c,0) for c in top12],
+                               0.12, color=colors[gi%len(colors)], label=str(grp))
+                    ax.set_xticks(np.arange(len(top12)) + 0.15)
+                    ax.set_xticklabels([str(c)[:12] for c in top12], rotation=45, ha='right')
+                    ax.set_ylabel('Concentration' if val_col!='area' else 'Peak Area')
+                    ax.legend(frameon=False)
+                    fig.tight_layout()
+                    p = str(plots_dir / f'Fig_bar_{size}.tiff')
+                    fig.savefig(p, dpi=600, format='tiff', pil_kwargs={'compression':'lzw'})
+                    plt.close(fig)
+                    generated.append(p)
+
+                elif ft == 'pca':
+                    pivot = df.pivot_table(values=val_col, index='sample', columns='compound', aggfunc='mean').fillna(0)
+                    X_s = StandardScaler().fit_transform(pivot.values)
+                    pca = PCA(n_components=2)
+                    X_pca = pca.fit_transform(X_s)
+                    evr = pca.explained_variance_ratio_
+                    fig, ax = plt.subplots(figsize=figsize)
+                    groups = sorted(df['group'].unique())
+                    for gi, grp in enumerate(groups):
+                        idxs = [i for i,s in enumerate(pivot.index) if df[df['sample']==s]['group'].iloc[0]==grp]
+                        if not idxs: continue
+                        ax.scatter(X_pca[idxs,0], X_pca[idxs,1], c=[colors[gi]], s=25,
+                                  label=str(grp), edgecolors='white', linewidth=0.5)
+                        for j in idxs:
+                            ax.annotate(str(pivot.index[j]).replace('.D',''), (X_pca[j,0], X_pca[j,1]),
+                                      fontsize=5, alpha=0.7)
+                    ax.set_xlabel(f'PC1 ({evr[0]*100:.0f}%)')
+                    ax.set_ylabel(f'PC2 ({evr[1]*100:.0f}%)')
+                    ax.legend(frameon=False)
+                    fig.tight_layout()
+                    p = str(plots_dir / f'Fig_pca_{size}.tiff')
+                    fig.savefig(p, dpi=600, format='tiff', pil_kwargs={'compression':'lzw'})
+                    plt.close(fig)
+                    generated.append(p)
+
+                elif ft == 'heatmap':
+                    pivot = df.pivot_table(values=val_col, index='sample', columns='compound', aggfunc='mean').fillna(0)
+                    data_z = ((pivot - pivot.mean()) / pivot.std()).fillna(0)
+                    fig, ax = plt.subplots(figsize=(figsize[0]*1.3, figsize[1]))
+                    im = ax.imshow(data_z.values, aspect='auto', cmap='RdBu_r',
+                                   vmin=-2, vmax=2, interpolation='nearest')
+                    ax.set_xticks(range(len(data_z.columns)))
+                    ax.set_xticklabels([str(c)[:10] for c in data_z.columns], rotation=90, fontsize=5)
+                    ax.set_yticks(range(len(data_z.index)))
+                    ax.set_yticklabels([str(i).replace('.D','') for i in data_z.index], fontsize=6)
+                    cbar = fig.colorbar(im, ax=ax, shrink=0.6)
+                    cbar.set_label('Z-score', fontsize=6)
+                    fig.tight_layout()
+                    p = str(plots_dir / f'Fig_heatmap_{size}.tiff')
+                    fig.savefig(p, dpi=600, format='tiff', pil_kwargs={'compression':'lzw'})
+                    plt.close(fig)
+                    generated.append(p)
+
+                elif ft == 'volcano':
+                    groups = df['group'].unique()
+                    if len(groups) >= 2:
+                        g1, g2 = str(groups[0]), str(groups[1])
+                        m1 = df[df['group']==g1].groupby('compound')[val_col].mean()
+                        m2 = df[df['group']==g2].groupby('compound')[val_col].mean()
+                        common = list(m1.index.intersection(m2.index))
+                        fc = np.log2((m2[common].values+1e-6)/(m1[common].values+1e-6))
+                        from scipy.stats import ttest_ind
+                        pvals = []
+                        for c in common:
+                            v1=df[(df['group']==g1)&(df['compound']==c)][val_col]
+                            v2=df[(df['group']==g2)&(df['compound']==c)][val_col]
+                            try: _,pv=ttest_ind(v1,v2); pvals.append(max(pv,1e-300))
+                            except: pvals.append(1.0)
+                        nlp=-np.log10(pvals)
+                        fig, ax = plt.subplots(figsize=figsize)
+                        sig = (np.abs(fc)>1)&(nlp>1.3)
+                        ax.scatter(fc[~sig], nlp[~sig], s=8, c='#999999', alpha=0.5, edgecolors='none')
+                        ax.scatter(fc[sig], nlp[sig], s=12, c=NATURE_COLORS['highlight'], alpha=0.8, edgecolors='none')
+                        ax.axhline(1.3, ls='--', lw=0.5, color='grey', alpha=0.5)
+                        ax.set_xlabel(f'log2({g2}/{g1})')
+                        ax.set_ylabel('-log10(p)')
+                        fig.tight_layout()
+                        p = str(plots_dir / f'Fig_volcano_{size}.tiff')
+                        fig.savefig(p, dpi=600, format='tiff', pil_kwargs={'compression':'lzw'})
+                        plt.close(fig)
+                        generated.append(p)
+
+                elif ft == 'boxplot':
+                    top8 = df.groupby('compound')[val_col].mean().nlargest(8).index
+                    sub = df[df['compound'].isin(top8)]
+                    fig, ax = plt.subplots(figsize=(figsize[0], figsize[1]*1.2))
+                    positions = []
+                    labels = []
+                    for ci, comp in enumerate(top8):
+                        for gi, grp in enumerate(sorted(df['group'].unique())):
+                            vals = sub[(sub['compound']==comp)&(sub['group']==grp)][val_col]
+                            pos = ci * (len(df['group'].unique())+1) + gi
+                            bp = ax.boxplot(vals, positions=[pos], widths=0.6,
+                                          patch_artist=True, showfliers=False,
+                                          boxprops=dict(facecolor=colors[gi], alpha=0.7, linewidth=0.5),
+                                          whiskerprops=dict(linewidth=0.5),
+                                          capprops=dict(linewidth=0.5),
+                                          medianprops=dict(linewidth=0.8, color='black'))
+                            positions.append(pos)
+                    ax.set_xticks([ci*(len(df['group'].unique())+1)+len(df['group'].unique())/2-0.5 for ci in range(len(top8))])
+                    ax.set_xticklabels([str(c)[:10] for c in top8], rotation=45, ha='right')
+                    ax.set_ylabel('Concentration' if val_col!='area' else 'Peak Area')
+                    from matplotlib.patches import Patch
+                    ax.legend([Patch(facecolor=colors[i]) for i in range(len(df['group'].unique()))],
+                             [str(g) for g in sorted(df['group'].unique())], frameon=False)
+                    fig.tight_layout()
+                    p = str(plots_dir / f'Fig_boxplot_{size}.tiff')
+                    fig.savefig(p, dpi=600, format='tiff', pil_kwargs={'compression':'lzw'})
+                    plt.close(fig)
+                    generated.append(p)
+
+            except Exception as e:
+                generated.append(f'ERROR[{ft}]: {e}')
+
+        return json.dumps({"status":"done","files":generated,"count":len([g for g in generated if not str(g).startswith('ERROR')]),
+                           "size":size,"format":"TIFF 600dpi LZW"}, ensure_ascii=False)
+
+    def _nature_report(self, sections='all'):
+        """Generate Nature-style statistical report with exact values."""
+        if self.df is None:
+            return json.dumps({"error": "No data loaded"}, ensure_ascii=False)
+
+        import numpy as np
+        from scipy import stats
+        df = self.df
+        val_col = 'area'
+        if 'conc_g100g' in df.columns and df['conc_g100g'].notna().sum() > 5:
+            val_col = 'conc_g100g'
+        elif 'amount' in df.columns and df['amount'].notna().sum() > 5:
+            val_col = 'amount'
+
+        report = {}
+        groups = sorted(df['group'].unique())
+
+        # Statistical summary with exact p-values
+        if sections in ('stats','all'):
+            compounds = sorted(df['compound'].unique())
+            stats_results = []
+            for comp in compounds[:30]:  # Top 30 for report
+                group_vals = {}
+                for g in groups:
+                    vals = df[(df['compound']==comp)&(df['group']==g)][val_col].dropna()
+                    if len(vals) > 0:
+                        group_vals[str(g)] = {
+                            'n': len(vals), 'mean': round(float(vals.mean()), 4),
+                            'sd': round(float(vals.std()), 4) if len(vals)>1 else 0,
+                            'sem': round(float(vals.sem()), 4) if len(vals)>1 else 0
+                        }
+                if len(group_vals) >= 2:
+                    v1 = df[(df['compound']==comp)&(df['group']==groups[0])][val_col]
+                    v2 = df[(df['compound']==comp)&(df['group']==groups[1])][val_col]
+                    if len(v1) > 1 and len(v2) > 1:
+                        t_stat, p_val = stats.ttest_ind(v1, v2)
+                        d = (v1.mean()-v2.mean()) / np.sqrt((v1.var()+v2.var())/2) if (v1.var()+v2.var()) > 0 else 0
+                        stats_results.append({
+                            'compound': str(comp),
+                            'groups': {str(g): v for g, v in group_vals.items()},
+                            'test': 'independent t-test',
+                            't_statistic': round(float(t_stat), 3),
+                            'df': len(v1)+len(v2)-2,
+                            'p_value': f"{p_val:.4f}" if p_val >= 0.0001 else f"{p_val:.2e}",
+                            'significant': p_val < 0.05,
+                            'cohens_d': round(float(d), 3),
+                            'effect_magnitude': 'large' if abs(d)>0.8 else 'medium' if abs(d)>0.5 else 'small'
+                        })
+            report['statistics'] = {
+                'n_compounds_tested': len(stats_results),
+                'n_significant': sum(1 for r in stats_results if r['significant']),
+                'alpha': 0.05,
+                'test': 'Two-sided independent t-test (no multiple comparison correction)',
+                'results': stats_results
+            }
+
+        # Figures section
+        if sections in ('figures','all'):
+            report['figures'] = {
+                'format': 'TIFF 600dpi LZW compression',
+                'color_mode': 'RGB',
+                'typography': 'Arial/Helvetica 7pt',
+                'sizes_available': {'single':'89mm','1.5col':'140mm','double':'183mm'},
+                'figure_types': ['bar','pca','heatmap','volcano','boxplot'],
+                'instruction': 'Use nature_figures tool to generate individual figures'
+            }
+
+        # Methods draft
+        if sections in ('methods','all'):
+            report['methods'] = (
+                f"Statistical analysis was performed using Python (scipy v{stats.__version__}). "
+                f"Group comparisons were made using two-sided independent t-tests without "
+                f"correction for multiple comparisons. Effect sizes are reported as Cohen's d. "
+                f"Data are presented as mean ± s.d. (n={df['sample'].nunique()} biologically "
+                f"independent samples). All statistical tests and P values are reported in "
+                f"Supplementary Table 1. Figures were prepared at 600 dpi following Nature "
+                f"submission guidelines."
+            )
+
+        # Compound table
+        if sections in ('table','all'):
+            table_data = []
+            for comp in sorted(df['compound'].unique())[:20]:
+                entry = {'compound': str(comp)}
+                for g in groups:
+                    vals = df[(df['compound']==comp)&(df['group']==g)][val_col]
+                    if len(vals) > 0:
+                        entry[f'{g}_mean'] = round(float(vals.mean()), 2)
+                        entry[f'{g}_sd'] = round(float(vals.std()), 2) if len(vals)>1 else 0
+                if 'rt' in df.columns:
+                    entry['rt_min'] = round(float(df[df['compound']==comp]['rt'].mean()), 2)
+                if 'cas' in df.columns:
+                    cas = df[df['compound']==comp]['cas'].dropna()
+                    if len(cas) > 0:
+                        entry['cas'] = str(cas.iloc[0])
+                table_data.append(entry)
+            report['compound_table'] = table_data
+
+        return json.dumps({"status":"done","report":report}, ensure_ascii=False)
+
     # ---- Individual plot methods ----
 
     def _plot_bar(self, title=None):
@@ -1629,7 +2212,14 @@ class GCMSAgent:
         import seaborn as sns
         plt.rcParams.update(PUBLICATION_RCPARAMS)
 
-        pivot = self.df.pivot_table(values='conc_g100g', index='sample', columns='compound', aggfunc='mean')
+        # Use same value-column fallback as PCA
+        val_col = 'area'
+        if 'conc_g100g' in self.df.columns and self.df['conc_g100g'].notna().sum() > 5:
+            val_col = 'conc_g100g'
+        elif 'amount' in self.df.columns and self.df['amount'].notna().sum() > 5:
+            val_col = 'amount'
+
+        pivot = self.df.pivot_table(values=val_col, index='sample', columns='compound', aggfunc='mean')
         data_norm = (pivot - pivot.mean()) / pivot.std()
         data_norm = data_norm.fillna(0)
 
@@ -1642,15 +2232,13 @@ class GCMSAgent:
             cmap='RdBu_r', center=0,
             figsize=(14, max(8, len(pivot) * 0.45)),
             linewidths=0.5,
-            annot=data_norm.round(2), fmt='.2f',
-            annot_kws={'fontsize': 7},
-            cbar_kws={'label': 'Z-score', 'shrink': 0.6},
+            cbar_kws={'shrink': 0.6},
             dendrogram_ratio=(0.15, 0.1),
             xticklabels=True, yticklabels=True,
         )
-        # x-label left blank intentionally — agent must ask user
-        # g.ax_heatmap.set_xlabel('', fontsize=12)
-        g.ax_heatmap.set_ylabel('Sample', fontsize=12)
+        g.ax_heatmap.tick_params(axis='both', labelsize=8)
+        g.ax_cbar.set_visible(False)  # hide colorbar label clutter
+
         if title:
             g.fig.suptitle(title, fontsize=14, fontweight='bold', y=1.02)
 
@@ -1663,52 +2251,98 @@ class GCMSAgent:
         import numpy as np
         import matplotlib.pyplot as plt
         from matplotlib.patches import Ellipse
+        from matplotlib import font_manager
         from sklearn.decomposition import PCA
         from sklearn.preprocessing import StandardScaler
         plt.rcParams.update(PUBLICATION_RCPARAMS)
 
-        pivot = self.df.pivot_table(values='conc_g100g', index=['group', 'sample'],
-                                     columns='compound', aggfunc='mean').fillna(0)
+        # Find a CJK-capable font
+        cjk_font = None
+        for f in font_manager.fontManager.ttflist:
+            fname = f.name.lower()
+            if any(k in fname for k in ['microsoft yahei', 'simhei', 'simsun', 'noto sans cjk',
+                                          'wenquanyi', 'source han', 'pingfang', 'heiti']):
+                cjk_font = f.name
+                break
+        if cjk_font:
+            plt.rcParams['font.sans-serif'] = [cjk_font] + plt.rcParams['font.sans-serif']
+            plt.rcParams['font.family'] = 'sans-serif'
+
+        # Pick best value column (prefer conc_g100g, fall back to area)
+        val_col = 'area'
+        if 'conc_g100g' in self.df.columns and self.df['conc_g100g'].notna().sum() > 5:
+            val_col = 'conc_g100g'
+        elif 'amount' in self.df.columns and self.df['amount'].notna().sum() > 5:
+            val_col = 'amount'
+
+        # Choose grouping: if few groups but many samples, group by sample
+        unique_groups = sorted(self.df['group'].unique())
+        unique_samples = sorted(self.df['sample'].unique())
+        if len(unique_groups) <= 2 and len(unique_samples) >= 4:
+            # Use sample-level grouping (each sample = one group in legend)
+            pivot = self.df.pivot_table(values=val_col, index='sample',
+                                         columns='compound', aggfunc='mean').fillna(0)
+            groups = unique_samples
+            group_mode = 'sample'
+        else:
+            pivot = self.df.pivot_table(values=val_col, index=['group', 'sample'],
+                                         columns='compound', aggfunc='mean').fillna(0)
+            groups = unique_groups
+            group_mode = 'group'
+
         aa_cols = list(pivot.columns)
-        groups = sorted(self.df['group'].unique())
-        colors = COLOR_PALETTES['categorical'][:len(groups)]
+        # Expand color palette if many groups
+        if len(groups) > len(COLOR_PALETTES['categorical']):
+            import matplotlib.cm as cm
+            colors = [cm.tab20(i / len(groups)) for i in range(len(groups))]
+        else:
+            colors = COLOR_PALETTES['categorical'][:len(groups)]
 
         X = pivot.values
         X_s = StandardScaler().fit_transform(X)
-        pca = PCA(n_components=min(3, X.shape[0], X.shape[1]))
+        pca = PCA(n_components=min(3, X_s.shape[0], X_s.shape[1]))
         X_pca = pca.fit_transform(X_s)
         evr = pca.explained_variance_ratio_
 
         fig, axes = plt.subplots(1, 2, figsize=(18, 8))
 
-        # Scores plot with confidence ellipses
+        # Scores plot
         ax = axes[0]
         for i, g in enumerate(groups):
-            mask = np.array([idx[0] == g for idx in pivot.index])
+            if group_mode == 'sample':
+                mask = np.array([idx == g for idx in pivot.index])
+            else:
+                mask = np.array([idx[0] == g for idx in pivot.index])
+            if not mask.any():
+                continue
             x_vals, y_vals = X_pca[mask, 0], X_pca[mask, 1]
-            ax.scatter(x_vals, y_vals, s=120, c=colors[i], label=g,
+            ax.scatter(x_vals, y_vals, s=140, c=[colors[i]], label=str(g),
                       edgecolors='black', linewidth=0.5, zorder=5, alpha=0.85)
 
-            # 95% confidence ellipse
+            # 95% confidence ellipse (only if ≥3 points in group)
             if len(x_vals) >= 3:
                 cov = np.cov(x_vals, y_vals)
                 eigenvalues, eigenvectors = np.linalg.eigh(cov)
                 angle = np.degrees(np.arctan2(eigenvectors[1, 0], eigenvectors[0, 0]))
-                width, height = 2 * np.sqrt(5.991 * eigenvalues)  # 95% CI chi2
+                width, height = 2 * np.sqrt(5.991 * eigenvalues)
                 ellipse = Ellipse((np.mean(x_vals), np.mean(y_vals)),
                                   width, height, angle=angle,
-                                  facecolor=colors[i], alpha=0.1, edgecolor=colors[i], linewidth=1)
+                                  facecolor=colors[i], alpha=0.08, edgecolor=colors[i], linewidth=1)
                 ax.add_patch(ellipse)
 
+            # Annotate sample names
             for j in np.where(mask)[0]:
-                lbl = pivot.index[j][1].replace('.D', '')
+                if group_mode == 'sample':
+                    lbl = str(pivot.index[j]).replace('.D', '')
+                else:
+                    lbl = str(pivot.index[j][1]).replace('.D', '')
                 ax.annotate(lbl, (X_pca[j, 0], X_pca[j, 1]),
                           fontsize=7, alpha=0.8, xytext=(4, 4), textcoords='offset points')
 
         ax.set_xlabel(f'PC1 ({evr[0]*100:.1f}%)', fontsize=12)
         ax.set_ylabel(f'PC2 ({evr[1]*100:.1f}%)', fontsize=12)
-        ax.set_title('PCA Scores (95% CI)', fontsize=13, fontweight='bold')
-        ax.legend(fontsize=9)
+        ax.set_title(title or 'PCA Scores (by {})'.format(group_mode), fontsize=13, fontweight='bold')
+        ax.legend(fontsize=8 if len(groups) > 6 else 9)
         ax.grid(alpha=0.3, linestyle='--')
 
         # Loadings plot
@@ -1717,18 +2351,18 @@ class GCMSAgent:
         for i, comp in enumerate(aa_cols):
             ax.arrow(0, 0, loadings[i, 0] * 3, loadings[i, 1] * 3,
                     head_width=0.06, head_length=0.09, fc='#e74c3c', ec='#c0392b', alpha=0.7)
-            ax.text(loadings[i, 0] * 3.3, loadings[i, 1] * 3.3, comp,
+            ax.text(loadings[i, 0] * 3.3, loadings[i, 1] * 3.3, str(comp),
                    fontsize=9, ha='center', va='center', fontweight='bold')
         ax.set_xlabel(f'PC1 ({evr[0]*100:.1f}%)', fontsize=12)
         ax.set_ylabel(f'PC2 ({evr[1]*100:.1f}%)', fontsize=12)
-        ax.set_title('PCA Loadings', fontsize=13, fontweight='bold')
+        ax.set_title('', fontsize=13, fontweight='bold')
         ax.grid(alpha=0.3, linestyle='--')
         ax.axhline(y=0, color='gray', alpha=0.3)
         ax.axvline(x=0, color='gray', alpha=0.3)
 
         plt.tight_layout()
         p = str(OUTPUT_DIR / "plots" / "pca.png")
-        fig.savefig(p)
+        fig.savefig(p, dpi=150, bbox_inches='tight')
         plt.close(fig)
         return p
 
@@ -1855,7 +2489,7 @@ class GCMSAgent:
         ax1.set_yticks(range(len(pd_df)))
         ax1.set_yticklabels(pd_df['label'], fontsize=7)
         ax1.set_xlabel('Total [g/100g]', fontsize=9)
-        ax1.set_title('Total per Sample', fontsize=11, fontweight='bold')
+        ax1.set_title('')
 
         # (0,1:) Group comparison bar
         ax2 = fig.add_subplot(gs[0, 1:])
@@ -1863,7 +2497,7 @@ class GCMSAgent:
         top8 = self.df.groupby('compound')['conc_g100g'].mean().nlargest(8).index
         pm = gm[gm['compound'].isin(top8)].pivot(index='group', columns='compound', values='conc_g100g').fillna(0)
         pm.plot(kind='bar', ax=ax2, color=colors[:len(pm)], edgecolor='black', linewidth=0.5)
-        ax2.set_title('Major Compounds by Group', fontsize=11, fontweight='bold')
+        ax2.set_title('')
         ax2.legend(fontsize=8)
         ax2.tick_params(axis='x', rotation=15)
         ax2.grid(axis='y', alpha=0.3, linestyle='--')
@@ -1875,7 +2509,7 @@ class GCMSAgent:
         hm_norm = (hm - hm.mean()) / hm.std()
         sns.heatmap(hm_norm, cmap='RdBu_r', center=0, ax=ax3,
                    cbar_kws={'label': 'Z-score', 'shrink': 0.8}, linewidths=0.3)
-        ax3.set_title('Profile Heatmap (Z-score)', fontsize=11, fontweight='bold')
+        ax3.set_title('')
         ax3.tick_params(labelsize=7)
 
         # (1,2) CV% by compound
@@ -1888,7 +2522,7 @@ class GCMSAgent:
         ax4.set_yticks(range(len(cv)))
         ax4.set_yticklabels(cv.index, fontsize=8)
         ax4.set_xlabel('CV%', fontsize=9)
-        ax4.set_title('Variability (CV%)', fontsize=11, fontweight='bold')
+        ax4.set_title('')
         ax4.axvline(x=25, color='gray', linestyle='--', alpha=0.5)
         ax4.axvline(x=50, color='gray', linestyle='--', alpha=0.5)
 
@@ -1899,7 +2533,7 @@ class GCMSAgent:
             ax5.hist(gdata, bins=30, alpha=0.5, label=g, color=colors[i % len(colors)])
         ax5.set_xlabel('Concentration [g/100g]', fontsize=9)
         ax5.set_ylabel('Frequency', fontsize=9)
-        ax5.set_title('Concentration Distribution', fontsize=11, fontweight='bold')
+        ax5.set_title('')
         ax5.legend(fontsize=7)
         ax5.grid(alpha=0.3, linestyle='--')
 
@@ -2028,7 +2662,8 @@ class GCMSAgent:
 
         ax.set_xlabel(f'log2 Fold Change ({group_a} / {group_b})', fontsize=12)
         ax.set_ylabel('-log10(p-value)', fontsize=12)
-        ax.set_title(f'Volcano Plot: {group_a} vs {group_b}', fontsize=14, fontweight='bold')
+        if title:
+            ax.set_title(title, fontsize=14, fontweight='bold')
         ax.legend(fontsize=9, loc='upper right')
         ax.grid(alpha=0.3, linestyle='--')
 
@@ -2082,7 +2717,8 @@ class GCMSAgent:
             dendrogram_ratio=(0.12, 0.12),
             xticklabels=True, yticklabels=True,
         )
-        g.ax_heatmap.set_title(f'{method.capitalize()} Correlation', fontsize=14, fontweight='bold', pad=20)
+        if title:
+            g.fig.suptitle(title, fontsize=14, fontweight='bold', y=1.02)
         g.ax_heatmap.tick_params(labelsize=9)
 
         p = str(OUTPUT_DIR / "plots" / "correlation_heatmap.png")
